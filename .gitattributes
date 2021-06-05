@@ -1,0 +1,4 @@
+[attr]normalise text eol=lf whitespace=tab-in-indent,trailing-space,tabwidth=4
+
+* text=auto eol=lf
+*.rs normalise
