@@ -10,4 +10,3 @@ toml = "0.5.8"
 serde = { version = "1.0.126", features = ["derive"] }
 directories = "3.0.2"
 argh = "0.1.4"
-derive-try-from-primitive = "1.0.0"

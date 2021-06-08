@@ -1,37 +1,25 @@
 use {
-    std::{
-        mem::MaybeUninit,
-        convert::TryInto
-    },
-    winapi::um::{
-        processthreadsapi::GetCurrentThreadId,
-        winuser::{
-            PM_REMOVE,
-            WM_COMMAND,
-            PeekMessageA
-        }
-    },
+    std::io,
     crate::{
         cfg,
         driver,
         process,
-        Result,
-        msg::Message
+        winutil::current_thread_id,
+        msg::{self, ThreadMessage}
     }
 };
 
-pub fn run(print_thread: bool) -> Result {
-    if print_thread {
-        println!("{}", unsafe { GetCurrentThreadId() });
-    }
-
-    let mut config = read_config();
+pub fn run(parent_thread: Option<u32>) -> io::Result<()> {
+    let mut config = init(parent_thread)?.config;
 
     loop {
-        if let Some(msg) = read_message() {
+        if let Some(msg) = msg::peek() {
             match msg {
-                Message::Stop => break,
-                Message::Reload => config = read_config()
+                msg::Server::Stop => break,
+                msg::Server::Reload { msg_thread } => {
+                    config = read_config();
+                    msg::Client::Printed.send(msg_thread)?
+                }
             }
         }
 
@@ -45,6 +33,23 @@ pub fn run(print_thread: bool) -> Result {
     }
 
     Ok(())
+}
+
+struct Init {
+    config: cfg::Config
+}
+
+fn init(parent_thread: Option<u32>) -> io::Result<Init> {
+    let config = read_config();
+
+    if let Some(thread) = parent_thread {
+        msg::Client::Running { msg_thread: current_thread_id() }
+            .send(thread)?;
+
+        msg::Client::Printed.send(thread)?
+    }
+
+    Ok(Init { config })
 }
 
 fn read_config() -> cfg::Config {
@@ -61,24 +66,4 @@ fn read_config() -> cfg::Config {
     }
 
     config
-}
-
-fn read_message() -> Option<Message> {
-    let mut msg = MaybeUninit::uninit();
-
-    let msg = unsafe {
-        let available = PeekMessageA(
-            msg.as_mut_ptr(),
-            -1_isize as _,
-            0,
-            0,
-            PM_REMOVE
-        ) != 0;
-
-        available.then(|| msg.assume_init())
-    }?;
-
-    (msg.message == WM_COMMAND)
-        .then(|| msg.wParam.try_into().ok())
-        .flatten()
 }

@@ -1,15 +1,18 @@
-use winapi::{
-    um::winuser::{
-        CURSORINFO,
-        EnumWindows,
-        GetCursorInfo,
-        GUITHREADINFO,
-        GetGUIThreadInfo,
-        GetWindowThreadProcessId
-    },
-    shared::{
-        windef::HWND,
-        minwindef::{BOOL, TRUE, FALSE, LPARAM}
+use {
+    crate::winutil::uninit_sized,
+    winapi::{
+        um::winuser::{
+            CURSORINFO,
+            EnumWindows,
+            GetCursorInfo,
+            GUITHREADINFO,
+            GetGUIThreadInfo,
+            GetWindowThreadProcessId
+        },
+        shared::{
+            windef::HWND,
+            minwindef::{BOOL, TRUE, FALSE, LPARAM}
+        }
     }
 };
 
@@ -50,7 +53,7 @@ unsafe extern "system" fn find_mouse_user(handle: HWND, state: LPARAM) -> BOOL {
 
 fn thread_uses_mouse(thread: u32) -> bool {
     let mut info = unsafe { 
-        new_info::<GUITHREADINFO>(|i| &mut i.cbSize)
+        uninit_sized::<GUITHREADINFO>(|i| &mut i.cbSize)
     };
 
     let success = unsafe {
@@ -62,7 +65,7 @@ fn thread_uses_mouse(thread: u32) -> bool {
 
 fn mouse_hidden() -> bool {
     let mut info = unsafe { 
-        new_info::<CURSORINFO>(|i| &mut i.cbSize)
+        uninit_sized::<CURSORINFO>(|i| &mut i.cbSize)
     };
 
     let success = unsafe { 
@@ -70,13 +73,4 @@ fn mouse_hidden() -> bool {
     };
 
     success != 0 && info.flags == 0
-}
-
-#[allow(clippy::uninit_assumed_init)]
-unsafe fn new_info<T>(size_member: fn(&mut T) -> &mut u32) -> T {
-    use std::mem::{MaybeUninit, size_of};
-
-    let mut info = MaybeUninit::<T>::uninit().assume_init();
-    *size_member(&mut info) = size_of::<T>() as _;
-    info
 }

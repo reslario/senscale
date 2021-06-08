@@ -23,10 +23,10 @@ pub struct Run {
     /// runs senscale in the foreground
     #[argh(switch)]
     pub foreground: bool,
-    /// prints the main thread id
+    /// sets the thread used for message passing
     /// (used internally when running in the background)
-    #[argh(switch)]
-    pub print_thread: bool
+    #[argh(option)]
+    pub parent_thread: Option<u32>
 }
 
 /// stops senscale
