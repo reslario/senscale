@@ -1,6 +1,6 @@
 use argh::FromArgs;
 
-/// senscale
+/// scales your mouse sensitivity on a per-process basis. 
 #[derive(FromArgs)]
 pub struct Args {
     #[argh(subcommand)]
