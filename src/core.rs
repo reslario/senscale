@@ -63,7 +63,7 @@ fn read_config() -> cfg::Config {
         eprintln!("scaling for:");
 
         for entry in &config.entries {
-            eprintln!("{}", entry.process)
+            eprintln!("{} ({})", entry.process, entry.sensitivity)
         }
     }
 
