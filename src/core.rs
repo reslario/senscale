@@ -29,7 +29,7 @@ pub fn run(parent_thread: Option<u32>) -> io::Result<()> {
             .find(|entry| process::ProcessIds::for_name(&entry.process)
                 .any(|proc| process::uses_mouse(proc, entry.only_if_cursor_hidden))
             ).map(|entry| driver::set_sens(entry.sensitivity))
-            .unwrap_or_else(driver::reset)?;
+            .unwrap_or_else(|| driver::set_sens(config.default_sensitivity))?;
     }
 
     Ok(())

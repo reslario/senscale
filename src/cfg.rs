@@ -9,8 +9,14 @@ use {
 #[derive(Deserialize)]
 #[derive(Default)]
 pub struct Config {
-    #[serde(rename = "entry")]
+    #[serde(default = "default_sensitivity")]
+    pub default_sensitivity: f64,
+    #[serde(default, rename = "entry")]
     pub entries: Vec<Entry>
+}
+
+const fn default_sensitivity() -> f64 {
+    1.0 
 }
 
 #[derive(Deserialize)]
@@ -55,4 +61,6 @@ const DEFAULT_CFG_FILE: &str = lines!(
     "# process = \"example.exe\""
     "# sensitivity = 4.2"
     "# only_if_cursor_hidden = true (optional, will only apply scaling if the cursor is hidden)"
+    ""
+    "default_sensitivity = 1.0"
 );
