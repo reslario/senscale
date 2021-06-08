@@ -56,6 +56,8 @@ fn read_config() -> cfg::Config {
     let config = cfg::read_config()
         .map_err(|e| eprintln!("config error: {}", e))
         .unwrap_or_default();
+
+    eprintln!("default sensitivity = {}", config.default_sensitivity);
     
     if !config.entries.is_empty() {
         eprintln!("scaling for:");
