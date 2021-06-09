@@ -23,13 +23,13 @@ pub fn run(parent_thread: Option<u32>) -> io::Result<()> {
             }
         }
 
-        config
-            .entries
-            .iter()
-            .find(|entry| process::ProcessIds::for_name(&entry.process)
-                .any(|proc| process::uses_mouse(proc, entry.only_if_cursor_hidden))
-            ).map(|entry| driver::set_sens(entry.sensitivity))
-            .unwrap_or_else(|| driver::set_sens(config.default_sensitivity))?;
+        let matches = process::ProcessIter::new()
+            .filter_map(|proc| proc.match_entry(&config.entries))
+            .collect::<Vec<_>>();
+
+        process::mouse_user(&matches)
+            .map(|m| driver::set_sens(m.entry.sensitivity))
+            .unwrap_or_else(|| driver::set_sens(config.default_sensitivity))?
     }
 
     Ok(())

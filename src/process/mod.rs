@@ -1,7 +1,7 @@
-mod id;
+mod iter;
 mod mouse;
 
 pub use {
-    id::ProcessIds,
-    mouse::uses_mouse
+    mouse::mouse_user,
+    iter::{Process, ProcessIter, Match},
 };

@@ -1,5 +1,8 @@
 use {
-    crate::winutil::uninit_sized,
+    crate::{
+        process::Match,
+        winutil::uninit_sized
+    },
     winapi::{
         um::winuser::{
             CURSORINFO,
@@ -11,44 +14,46 @@ use {
         },
         shared::{
             windef::HWND,
-            minwindef::{BOOL, TRUE, FALSE, LPARAM}
+            minwindef::{BOOL, LPARAM}
         }
     }
 };
 
-struct FindState {
-    process_id: u32,
-    check_hidden: bool,
-    found: bool
+struct FindState<'a> {
+    processes: &'a [Match<'a>],
+    found: Option<Match<'a>>
 }
 
-pub fn uses_mouse(process_id: u32, check_hidden: bool) -> bool {
+pub fn mouse_user<'a>(processes: &'a [Match<'a>]) -> Option<Match<'a>> {
     let mut state = FindState {
-        process_id,
-        check_hidden,
-        found: false
+        processes,
+        found: None
     };
 
-    unsafe { EnumWindows(Some(find_mouse_user), &mut state as *mut _ as _) };
+    enum_windows(find_mouse_user, &mut state);
 
     state.found
 }
 
-unsafe extern "system" fn find_mouse_user(handle: HWND, state: LPARAM) -> BOOL {
-    let mut state = &mut *(state as *mut FindState);
-
+fn find_mouse_user(handle: HWND, state: &mut FindState) -> bool {
     let mut process_id = 0;
-    let thread_id = GetWindowThreadProcessId(handle, &mut process_id);
+    let thread_id = unsafe {
+        GetWindowThreadProcessId(handle, &mut process_id)
+    };
 
-    if process_id == state.process_id
+    state.found = state
+        .processes
+        .iter()
+        .copied()
+        .find(|proc| is_mouse_user(*proc, process_id, thread_id));
+
+    state.found.is_none()
+}
+
+fn is_mouse_user(process: Match, process_id: u32, thread_id: u32) -> bool {
+    process_id == process.process_id
         && thread_uses_mouse(thread_id)
-        && (!state.check_hidden || mouse_hidden()) 
-    {
-        state.found = true;
-        FALSE
-    } else {
-        TRUE
-    }
+        && (!process.entry.only_if_cursor_hidden || mouse_hidden())
 }
 
 fn thread_uses_mouse(thread: u32) -> bool {
@@ -73,4 +78,26 @@ fn mouse_hidden() -> bool {
     };
 
     success != 0 && info.flags == 0
+}
+
+fn enum_windows<T, F>(f: F, state: &mut T)
+where F: FnMut(HWND, &mut T) -> bool {
+    struct State<'a, T, F> {
+        f: F,
+        data: &'a mut T
+    }
+
+    unsafe extern "system" fn callback<T, F>(handle: HWND, state: LPARAM) -> BOOL
+    where F: FnMut(HWND, &mut T) -> bool {
+        let state = &mut *(state as *mut State<T, F>);
+
+        (state.f)(handle, state.data).into()
+    }
+
+    let mut state = State { 
+        f,
+        data: state
+    };
+    
+    unsafe { EnumWindows(Some(callback::<T, F>), &mut state as *mut _ as _) };
 }
