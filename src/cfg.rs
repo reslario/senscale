@@ -7,12 +7,20 @@ use {
 };
 
 #[derive(Deserialize)]
-#[derive(Default)]
 pub struct Config {
     #[serde(default = "default_sensitivity")]
     pub default_sensitivity: f64,
     #[serde(default, rename = "entry")]
     pub entries: Vec<Entry>
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            default_sensitivity: default_sensitivity(),
+            entries: vec![]
+        }
+    }
 }
 
 const fn default_sensitivity() -> f64 {
