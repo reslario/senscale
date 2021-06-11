@@ -1,7 +1,5 @@
 #![cfg(windows)]
 
-mod driver;
-mod process;
 mod cfg;
 mod cli;
 mod wrap;

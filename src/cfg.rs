@@ -66,7 +66,7 @@ const DEFAULT_CFG_FILE: &str = lines!(
     "# format for defining an entry:"
     "#"
     "# [[entry]]"
-    "# process = \"example.exe\""
+    "# process = 'example.exe' (this can be a full path to avoid ambiguity)"
     "# sensitivity = 4.2"
     "# only_if_cursor_hidden = true (optional, will only apply scaling if the cursor is hidden)"
     ""

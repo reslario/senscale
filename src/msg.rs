@@ -8,10 +8,10 @@ use {
         shared::windef::HWND,
         um::winuser::{
             MSG,
-            PM_REMOVE,
             WM_COMMAND,
             GetMessageA,
-            PeekMessageA,
+            TranslateMessage,
+            DispatchMessageA,
             PostThreadMessageA
         }
     }
@@ -97,12 +97,6 @@ fn send_message(thread: u32, ident: usize, param: isize) -> io::Result<()> {
     )
 }
 
-pub fn peek<T: ThreadMessage>() -> Option<T> {
-    unsafe {
-        read_message(|msg| PeekMessageA(msg, WIN, MIN, MAX, PM_REMOVE))
-    }
-}
-
 pub fn wait<T: ThreadMessage>() -> Option<T> {
     unsafe {
         read_message(|msg| GetMessageA(msg, WIN, MIN, MAX))
@@ -118,4 +112,25 @@ unsafe fn read_message<T: ThreadMessage>(read: impl Fn(*mut MSG) -> i32) -> Opti
         .then(|| T::try_from(msg.wParam, msg.lParam))
         .flatten()
 
+}
+
+pub fn iter<T: ThreadMessage>() -> impl Iterator<Item = T> {
+    let mut msg = MaybeUninit::uninit();
+
+    std::iter::from_fn(move || {
+        while unsafe { GetMessageA(msg.as_mut_ptr(), std::ptr::null_mut(), MIN, MAX) > 0 } {
+            let msg = unsafe { msg.assume_init() };
+
+            if msg.message == WM_COMMAND {
+                return T::try_from(msg.wParam, msg.lParam)
+            } else {
+                unsafe {
+                    TranslateMessage(&msg);
+                    DispatchMessageA(&msg);
+                }
+            }
+        }
+
+        None
+    })
 }
