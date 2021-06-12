@@ -21,7 +21,7 @@ pub fn run() -> io::Result<()> {
     }
 
     let mut child = Child::spawn()?;
-    child.print_output()?;
+    child.wait_for_output()?;
     child.save()
 }
 
@@ -79,15 +79,21 @@ impl Child {
     }
 
     fn print_output(&mut self) -> io::Result<()> {
-        if let Some(msg::Client::Printed { .. }) = msg::wait() {
-            let mut stdout = io::stdout();
-            let mut output = output_file_read()?;
-            output.seek(SeekFrom::Start(self.output_pos))?;
+        let mut stdout = io::stdout();
+        let mut output = output_file_read()?;
+        output.seek(SeekFrom::Start(self.output_pos))?;
     
-            self.output_pos += io::copy(&mut output, &mut stdout)?;
-        }
+        self.output_pos += io::copy(&mut output, &mut stdout)?;
     
         Ok(())
+    }
+
+    fn wait_for_output(&mut self) -> io::Result<()> {
+        if let Some(msg::Client::Printed { .. }) = msg::wait() {
+            self.print_output() 
+        } else {
+            Ok(())
+        }
     }
 
     fn send(&self, msg: msg::Server) -> io::Result<()> {
@@ -106,7 +112,7 @@ pub fn stop() -> io::Result<()> {
 pub fn reload() -> io::Result<()> {
     let mut child = Child::load()?;
     child.send(msg::Server::Reload { msg_thread: current_thread_id() })?;
-    child.print_output()?;
+    child.wait_for_output()?;
     child.save()
 }
 
@@ -115,6 +121,12 @@ pub fn clean() {
         fs::remove_file(instance_file()),
         fs::remove_file(output_file_path())
     );
+}
+
+pub fn print_output() -> io::Result<()> {
+    let mut child = Child::load()?;
+    child.print_output()?;
+    child.save()
 }
 
 fn instance_file_error(err: io::Error) -> io::Error {

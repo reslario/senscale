@@ -13,7 +13,8 @@ pub enum Command {
     Run(Run),
     Stop(Stop),
     Reload(Reload),
-    Clean(Clean)
+    Clean(Clean),
+    PrintOutput(PrintOutput)
 }
 
 /// runs senscale
@@ -43,3 +44,9 @@ pub struct Reload {}
 #[derive(FromArgs)]
 #[argh(subcommand, name = "clean")]
 pub struct Clean {}
+
+/// prints all the output from a running instance that
+/// has accumulated since the last time it was checked
+#[derive(FromArgs)]
+#[argh(subcommand, name = "print-output")]
+pub struct PrintOutput {}
