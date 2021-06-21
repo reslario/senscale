@@ -13,10 +13,10 @@ use {
     },
 };
 
-pub fn write_settings(settings: &mut Settings) -> io::Result<()> {
+pub fn write_settings(handle: &File, settings: &mut Settings) -> io::Result<()> {
     const RA_WRITE: u32 = 0x889;
 
-    rawaccel_control::<_, ()>(rawaccel_code(RA_WRITE), Some(settings), None)
+    device_io_control::<_, ()>(handle, rawaccel_code(RA_WRITE), Some(settings), None)
 }
 
 fn rawaccel_code(code: u32) -> u32 {
@@ -25,20 +25,6 @@ fn rawaccel_code(code: u32) -> u32 {
     const RA_DEV_TYPE: u32 = 0x8888;
 
     CTL_CODE(RA_DEV_TYPE, code, METHOD_BUFFERED, FILE_ANY_ACCESS)
-}
-
-fn rawaccel_control<I, O>(code: u32, input: Option<&mut I>, output: Option<&mut O>) -> io::Result<()> {
-    File::open(r"\\.\rawaccel")
-        .map_err(rawaccel_file_error)
-        .and_then(|device| device_io_control(&device, code, input, output))
-}
-
-fn rawaccel_file_error(e: io::Error) -> io::Error {
-    if e.kind() == io::ErrorKind::NotFound {
-        io::Error::new(e.kind(), "RawAccel drivers not installed")
-    } else {
-        e
-    }
 }
 
 fn device_io_control<I, O>(device: &File, code: u32, input: Option<&mut I>, output: Option<&mut O>) -> io::Result<()> {

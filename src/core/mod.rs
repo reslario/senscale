@@ -17,10 +17,27 @@ mod cursor;
 mod driver;
 
 pub fn run(parent_thread: Option<u32>) -> io::Result<()> {
-    let config = init(parent_thread)?.config;
-    let driver = Driver::new();
+    let Init { config, driver } = match parent_thread {
+        Some(thread) => {
+            msg::Client::Running { msg_thread: current_thread_id() }
+                .send(thread)?;
+
+            match init() {
+                Ok(init) => {
+                    msg::Client::Printed.send(thread)?;
+                    init
+                },
+                Err(e) => {
+                    eprint!("{}", e);
+                    return msg::Client::Printed.send(thread)
+                }
+            }
+        },
+        None => init()?
+    };
+
     let mut hook = Hooks::set(config, driver, on_focus_changed)
-        .expect("hook already set");
+        .expect("hooks already set");
 
     for msg in msg::iter() {
         match msg {
@@ -36,20 +53,15 @@ pub fn run(parent_thread: Option<u32>) -> io::Result<()> {
 }
 
 struct Init {
-    config: cfg::Config
+    config: cfg::Config,
+    driver: Driver
 }
 
-fn init(parent_thread: Option<u32>) -> io::Result<Init> {
+fn init() -> io::Result<Init> {
     let config = read_config();
+    let driver = Driver::new()?;
 
-    if let Some(thread) = parent_thread {
-        msg::Client::Running { msg_thread: current_thread_id() }
-            .send(thread)?;
-
-        msg::Client::Printed.send(thread)?
-    }
-
-    Ok(Init { config })
+    Ok(Init { config, driver })
 }
 
 fn read_config() -> Config {
