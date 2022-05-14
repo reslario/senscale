@@ -1,4 +1,5 @@
 use {
+    crate::winutil,
     super::settings::Settings,
     winapi::{
         ctypes::c_void,
@@ -31,7 +32,7 @@ fn device_io_control<I, O>(device: &File, code: u32, input: Option<&mut I>, outp
     let input = SizedVoid::from(input);
     let output = SizedVoid::from(output);
 
-    let success = unsafe {
+    winutil::validate(unsafe {
         DeviceIoControl(
             device.as_raw_handle() as _,
             code,
@@ -42,13 +43,7 @@ fn device_io_control<I, O>(device: &File, code: u32, input: Option<&mut I>, outp
             &mut 0,
             ptr::null_mut()
         )
-    } != 0;
-
-    if success {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
+    })
 }
 
 struct SizedVoid {
