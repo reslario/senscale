@@ -53,15 +53,30 @@ struct SizedVoid {
 
 impl <T> From<Option<&mut T>> for SizedVoid {
     fn from(val: Option<&mut T>) -> Self {
-        match val {
-            Some(val) => SizedVoid {
-                ptr: val as *mut _ as _,
-                size: size_of::<T>() as _
-            },
-            None => SizedVoid {
-                ptr: ptr::null_mut(),
-                size: 0
-            }
-        }
+        val.map(|val| SizedVoid {
+            ptr: val as *mut _ as _,
+            size: size_of::<T>() as _
+        })
+        .unwrap_or(SizedVoid {
+            ptr: ptr::null_mut(),
+            size: 0
+        })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn sized_void_from() {
+        struct Val([u8; 8], u64);
+
+        let val = &mut Val([0; 8], 2);
+        let val_ptr = val as *mut _;
+        let void = SizedVoid::from(Some(val));
+
+        assert_eq!(void.ptr.cast(), val_ptr);
+        assert_eq!(16, void.size);
     }
 }
