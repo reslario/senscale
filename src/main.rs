@@ -11,7 +11,7 @@ type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 fn main() {
     if let Err(e) = run() {
-        eprint!("error: {}", e)
+        eprint!("error: {e}")
     }
 }
 

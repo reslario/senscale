@@ -28,7 +28,7 @@ pub fn run(parent_thread: Option<u32>) -> io::Result<()> {
                     init
                 },
                 Err(e) => {
-                    eprint!("{}", e);
+                    eprint!("{e}");
                     return msg::Client::Printed.send(thread)
                 }
             }
@@ -66,7 +66,7 @@ fn init() -> io::Result<Init> {
 
 fn read_config() -> Config {
     let config = cfg::read_config()
-        .map_err(|e| eprintln!("config error: {}", e))
+        .map_err(|e| eprintln!("config error: {e}"))
         .unwrap_or_default();
 
     eprintln!("default sensitivity = {}", config.default_sensitivity);
@@ -96,7 +96,7 @@ fn on_focus_changed(config: &Config, driver: &mut Driver, process: &hook::Proces
         
 
     if let Err(e) = res {
-        eprint!("{}", e)
+        eprint!("{e}")
     }
 }
 
