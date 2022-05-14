@@ -27,6 +27,7 @@ pub fn run() -> io::Result<()> {
     child.save()
 }
 
+#[derive(Debug, PartialEq, Eq)]
 struct Child {
     thread_id: u32,
     output_pos: u64
@@ -58,26 +59,40 @@ impl Child {
         })
     }
 
+    fn to_bytes(&self) -> [u8; 12] {
+        let mut out = [0; 12];
+        let (a, b) = out.split_at_mut(4);
+        a.copy_from_slice(&self.thread_id.to_le_bytes());
+        b.copy_from_slice(&self.output_pos.to_le_bytes());
+        out
+    }
+
+    fn from_bytes(bytes: [u8; 12]) -> Child {
+        let (mut a, mut b) = ([0; 4], [0; 8]);
+        let (left, right) = bytes.split_at(4);
+        a.copy_from_slice(left);
+        b.copy_from_slice(right);
+        
+        Child {
+            thread_id: u32::from_le_bytes(a),
+            output_pos: u64::from_le_bytes(b)
+        }
+    }
+
     fn save(&self) -> io::Result<()> {
         let mut file = File::create(instance_file())?;
-        file.write_all(&self.thread_id.to_le_bytes())?;
-        file.write_all(&self.output_pos.to_le_bytes())
+        file.write_all(&self.to_bytes())
     }
 
     fn load() -> io::Result<Child> {
-        let mut thread = 0_u32.to_le_bytes();
-        let mut pos = 0_u64.to_le_bytes();
+        let mut bytes = [0; 12];
 
         let mut file = File::open(instance_file())
             .map_err(instance_file_error)?;
 
-        file.read_exact(&mut thread)?;
-        file.read_exact(&mut pos)?;
+        file.read_exact(&mut bytes)?;
 
-        Ok(Child {
-            thread_id: u32::from_le_bytes(thread),
-            output_pos: u64::from_le_bytes(pos)
-        })
+        Ok(Child::from_bytes(bytes))
     }
 
     fn print_output(&mut self) -> io::Result<()> {
@@ -198,4 +213,37 @@ fn set_sens(config_path: impl AsRef<Path>, process: PathBuf, sens: f64) -> Resul
     let _ = reload();
 
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn child_to_bytes() {
+        let thread_id = u32::MAX;
+        let output_pos = 9259542123273814144;
+
+        assert_eq!(
+            [255, 255, 255, 255, 128, 128, 128, 128, 128, 128, 128, 128],
+            Child { thread_id, output_pos }.to_bytes()
+        )
+    }
+
+    #[test]
+    fn child_from_bytes() {
+        assert_eq!(
+            Child { thread_id: u32::MAX, output_pos: 9259542123273814144 },
+            Child::from_bytes([255, 255, 255, 255, 128, 128, 128, 128, 128, 128, 128, 128])
+        )
+    }
+
+    #[test]
+    fn child_roundtrip() {
+        let child = Child { thread_id: 31267374, output_pos: 9613725632561 };
+        assert_eq!(
+            child,
+            Child::from_bytes(child.to_bytes())
+        )
+    }
 }
