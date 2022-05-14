@@ -1,17 +1,17 @@
 const MAX_DEV_ID_LEN: usize = 200;
 
 #[repr(C)]
-pub struct Vec2<T> {
+struct Vec2<T> {
     x: T,
     y: T
 }
 
 impl <T> Vec2<T> {
-    pub fn new(x: T, y: T) -> Vec2<T> {
+    fn new(x: T, y: T) -> Vec2<T> {
         Vec2 { x, y }
     }
 
-    pub fn both(val: T) -> Vec2<T>
+    fn both(val: T) -> Vec2<T>
     where T: Clone {
         Vec2::new(val.clone(), val)
     }
@@ -20,7 +20,7 @@ impl <T> Vec2<T> {
 #[repr(C)]
 #[derive(Copy, Clone)]
 #[allow(unused)]
-pub enum AccelMode {
+enum AccelMode {
     Linear,
     Classic,
     Natural,
@@ -33,7 +33,7 @@ pub enum AccelMode {
 #[repr(C)]
 #[allow(unused)]
 #[derive(Copy, Clone)]
-pub struct AccelArgs {
+struct AccelArgs {
     offset: f64,
     legacy_offset: bool,
     accel: f64,
@@ -49,7 +49,7 @@ pub struct AccelArgs {
 
 #[repr(C)]
 #[allow(unused)]
-pub struct DomainArgs {
+struct DomainArgs {
     domain_weights: Vec2<f64>,
     lp_norm: f64,
 }
