@@ -1,16 +1,18 @@
 use {
     winapi::um::winbase::{CREATE_NEW_PROCESS_GROUP, DETACHED_PROCESS},
     crate::{
+        Result,
         winutil::current_thread_id,
-        msg::{self, ThreadMessage}
+        msg::{self, ThreadMessage},
+        cfg::{self, EditableConfig}
     },
     std::{
         env,
-        path::PathBuf,
         process::Command,
-        fs::{self, File},
+        path::{Path, PathBuf},
+        fs::{self, File, OpenOptions},
         os::windows::process::CommandExt,
-        io::{self, Read, Write, Seek, SeekFrom}
+        io::{self, Read, Write, Seek, SeekFrom, BufRead, BufReader, BufWriter}
     }
 };
 
@@ -154,4 +156,46 @@ fn output_file_write() -> io::Result<File> {
 
 fn output_file_read() -> io::Result<File> {
     File::open(output_file_path())
+}
+
+pub fn adjust(process: PathBuf) -> Result {
+    let config = cfg::config_dir()?.file();
+
+    for res in io::stdin()
+        .lock()
+        .lines()
+        .filter_map(io::Result::ok)
+        .map_while(|line| {
+            let line = line.trim();
+            (!line.is_empty()).then(|| line.parse::<f64>())
+        })
+    {
+        match res {
+            Ok(sens) => set_sens(&config, process.clone(), sens)?,
+            Err(e) => eprintln!("failed to parse as number: {e}")
+        }
+    }
+
+    Ok(())
+}
+
+fn set_sens(config_path: impl AsRef<Path>, process: PathBuf, sens: f64) -> Result {
+    let mut config: EditableConfig = serde_yaml::from_reader(BufReader::new(File::open(&config_path)?))?;
+
+    config
+        .processes
+        .entry(process)
+        .or_insert_with(<_>::default)
+        .sensitivity = sens;
+
+    let file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(config_path)?;
+
+    cfg::write_config(&config, BufWriter::new(file))?;
+
+    let _ = reload();
+
+    Ok(())
 }
