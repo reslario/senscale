@@ -71,11 +71,11 @@ fn read_config() -> Config {
 
     eprintln!("default sensitivity = {}", config.default_sensitivity);
     
-    if !config.entries.is_empty() {
+    if !config.processes.is_empty() {
         eprintln!("scaling for:");
 
-        for entry in &config.entries {
-            eprintln!("{} ({})", entry.process, entry.sensitivity)
+        for (process, entry) in &config.processes {
+            eprintln!("{} ({})", process.display(), entry.sensitivity)
         }
     }
 
@@ -84,12 +84,16 @@ fn read_config() -> Config {
 
 fn on_focus_changed(config: &Config, driver: &mut Driver, process: &hook::Process) {
     let res = config
-        .entries
-        .iter()
-        .find(|entry| entry.exe_matches(process))
+        .processes
+        .get(process.exe())
+        .or_else(|| config
+            .processes
+            .get(Path::new(process.exe().file_name()?))
+        )
         .filter(|entry| entry.cursor_matches(process))
         .map(|entry| driver.set_sens(entry.sensitivity))
         .unwrap_or_else(|| driver.set_sens(config.default_sensitivity));
+        
 
     if let Err(e) = res {
         eprint!("{}", e)
@@ -97,23 +101,8 @@ fn on_focus_changed(config: &Config, driver: &mut Driver, process: &hook::Proces
 }
 
 impl cfg::Entry {
-    fn exe_matches(&self, process: &hook::Process) -> bool {
-        if is_path(&self.process) {
-            process.exe() == self.process.as_str()
-        } else {
-            Path::new(process.exe())
-                .file_name()
-                .map(|name| name == self.process.as_str())
-                .unwrap_or_default()
-        }
-    }
-
     fn cursor_matches(&self, process: &hook::Process) -> bool {
         !self.only_if_cursor_hidden 
             || process.cursor_hidden.unwrap_or_else(cursor::hidden)
     }
-}
-
-fn is_path(exe: impl AsRef<Path>) -> bool {
-    exe.as_ref().parent() != Some("".as_ref())
 }

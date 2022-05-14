@@ -1,0 +1,15 @@
+# Format for defining process-sensitivity mappings:
+#
+# processes:
+#   process_exe_path: sensitivity_multiplier
+#   ...
+#
+# Example:
+#
+# process.exe: 4.2 (the .exe can be a full path to avoid ambiguity)
+#
+# You can also specify additional options using this format:
+#
+# process.exe:
+#   sensitivity: 4.2
+#   only_if_cursor_hidden: true (will only apply scaling if the cursor is hidden)

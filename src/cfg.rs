@@ -1,74 +1,151 @@
 use {
-    std::fs,
-    toml::de,
     crate::Result,
-    serde::Deserialize,
-    directories::ProjectDirs
+    directories::ProjectDirs,
+    linked_hash_map::LinkedHashMap,
+    serde::{Serialize, Deserialize},
+    std::{
+        fs::{self, File},
+        collections::HashMap,
+        path::{Path, PathBuf},
+        io::{Write, BufWriter, BufReader},
+    }
 };
 
-#[derive(Deserialize)]
-pub struct Config {
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GenericConfig<E> {
     #[serde(default = "default_sensitivity")]
     pub default_sensitivity: f64,
-    #[serde(default, rename = "entry")]
-    pub entries: Vec<Entry>
+    pub processes: E
 }
 
-impl Default for Config {
+pub type Config = GenericConfig<HashMap<PathBuf, Entry>>;
+pub type EditableConfig = GenericConfig<LinkedHashMap<PathBuf, Entry>>;
+
+impl <E: Default> Default for GenericConfig<E> {
     fn default() -> Self {
-        Config {
+        GenericConfig {
             default_sensitivity: default_sensitivity(),
-            entries: vec![]
+            processes: <_>::default()
         }
     }
 }
 
-const fn default_sensitivity() -> f64 {
+pub const fn default_sensitivity() -> f64 {
     1.0 
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum ConfigEntry {
+    Short(f64),
+    Long(Entry)
+}
+
+impl From<ConfigEntry> for Entry {
+    fn from(entry: ConfigEntry) -> Self {
+        match entry {
+            ConfigEntry::Long(entry) => entry,
+            ConfigEntry::Short(sensitivity) => Entry {
+                sensitivity,
+                only_if_cursor_hidden: <_>::default()
+            }
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(from = "ConfigEntry")]
 pub struct Entry {
-    pub process: String,
     pub sensitivity: f64,
     #[serde(default)]
     pub only_if_cursor_hidden: bool
 }
 
-pub fn read_config() -> Result<Config> {
-    let dirs = ProjectDirs::from("io.github", "reslario", "senscale")
-        .ok_or("couldn't get program directories")?;
-    let dir = dirs.config_dir();
-    
-    let path = dir.join("config.toml");
-
-    if path.exists() {
-        let toml = fs::read_to_string(path)?;
-        
-        de::from_str(&toml)
-            .map_err(<_>::into)
-    } else {
-        fs::create_dir_all(dir)?;
-        fs::write(path, DEFAULT_CFG_FILE)?;
-        Ok(<_>::default())
+impl Entry {
+    fn can_be_short(&self) -> bool {
+        self.only_if_cursor_hidden == <_>::default()
     }
 }
 
-macro_rules! lines {
-    ($($lit:literal)*) => {
-        concat!(
-            $( concat!($lit, "\n") ),*
-        )
-    };
+impl Serialize for Entry {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where S: serde::Serializer {
+        if self.can_be_short() {
+            ConfigEntry::Short(self.sensitivity).serialize(serializer)
+        } else {
+            #[derive(Serialize)]
+            struct EntryProxy {
+                sensitivity: f64,
+                only_if_cursor_hidden: bool
+            }
+
+            let proxy = EntryProxy {
+                sensitivity: self.sensitivity,
+                only_if_cursor_hidden: self.only_if_cursor_hidden
+            };
+
+            proxy.serialize(serializer)
+        }
+    }
 }
 
-const DEFAULT_CFG_FILE: &str = lines!(
-    "# format for defining an entry:"
-    "#"
-    "# [[entry]]"
-    "# process = 'example.exe' (this can be a full path to avoid ambiguity)"
-    "# sensitivity = 4.2"
-    "# only_if_cursor_hidden = true (optional, will only apply scaling if the cursor is hidden)"
-    ""
-    "default_sensitivity = 1.0"
-);
+impl Default for Entry {
+    fn default() -> Self {
+        Self {
+            sensitivity: default_sensitivity(),
+            only_if_cursor_hidden: <_>::default()
+        }
+    }
+}
+
+pub fn read_config() -> Result<Config> {
+    let dir = config_dir()?;
+    let file = dir.file();
+
+    if file.exists() {
+        let yaml = File::open(file)?;
+        
+        serde_yaml::from_reader(BufReader::new(yaml))
+            .map_err(<_>::into)
+    } else {
+        fs::create_dir_all(&*dir)?;
+        let config = Config::default();
+        write_config(&config, BufWriter::new(File::create(file)?))?;
+        Ok(config)
+    }
+}
+
+const CFG_HEADER: &str = include_str!("./cfg_header.yaml");
+
+pub fn write_config<E: Serialize>(config: &GenericConfig<E>, mut writer: impl Write) -> Result<()> {
+    writer.write_all(CFG_HEADER.as_bytes())?;
+
+    serde_yaml::to_writer(writer, config)?;
+
+    Ok(())
+}
+
+pub fn config_dir() -> Result<ConfigDir> {
+    let dirs = ProjectDirs::from("io.github", "reslario", "senscale")
+        .ok_or("couldn't get program directories")?;
+
+    Ok(ConfigDir { dirs })
+}
+
+pub struct ConfigDir {
+    dirs: ProjectDirs
+}
+
+impl std::ops::Deref for ConfigDir {
+    type Target = Path;
+
+    fn deref(&self) -> &Self::Target {
+        self.dirs.config_dir()
+    }
+}
+
+impl ConfigDir {
+    pub fn file(&self) -> PathBuf {
+        self.join("config.yaml")
+    }
+}

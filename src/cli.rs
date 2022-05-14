@@ -1,4 +1,7 @@
-use argh::FromArgs;
+use {
+    argh::FromArgs,
+    std::path::PathBuf
+};
 
 /// scales your mouse sensitivity on a per-process basis. 
 #[derive(FromArgs)]
@@ -14,7 +17,8 @@ pub enum Command {
     Stop(Stop),
     Reload(Reload),
     Clean(Clean),
-    PrintOutput(PrintOutput)
+    PrintOutput(PrintOutput),
+    Adjust(Adjust)
 }
 
 /// runs senscale
@@ -50,3 +54,12 @@ pub struct Clean {}
 #[derive(FromArgs)]
 #[argh(subcommand, name = "print-output")]
 pub struct PrintOutput {}
+
+/// lets you easily adjust a process' sensitivity until you've found the right one
+#[derive(FromArgs)]
+#[argh(subcommand, name = "adjust")]
+pub struct Adjust {
+    /// the .exe of the process
+    #[argh(positional)]
+    pub process: PathBuf
+}

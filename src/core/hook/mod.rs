@@ -2,7 +2,8 @@ use {
     state::State,
     std::{
         ptr,
-        ffi::{OsStr, OsString},
+        ffi::OsString,
+        path::{PathBuf, Path},
         os::windows::ffi::OsStringExt
     },
     crate::{
@@ -96,19 +97,19 @@ impl Drop for Hooks {
 }
 
 pub struct Process {
-    path: OsString,
+    path: PathBuf,
     pub cursor_hidden: Option<bool>
 }
 
 impl Process {
     fn new(path: &[u16]) -> Process {
         Process {
-            path: OsString::from_wide(path),
+            path: OsString::from_wide(path).into(),
             cursor_hidden: None
         }
     }
 
-    pub fn exe(&self) -> &OsStr {
+    pub fn exe(&self) -> &Path {
         &self.path
     }
 }
