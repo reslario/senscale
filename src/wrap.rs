@@ -215,6 +215,15 @@ fn set_sens(config_path: impl AsRef<Path>, process: PathBuf, sens: f64) -> Resul
     Ok(())
 }
 
+pub fn config() -> Result {
+    let file = cfg::config_dir()?.file();
+    if !file.exists() {
+        cfg::create_config(&file)?;
+    }
+    print!("{}", file.display());
+    Ok(())
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

@@ -18,7 +18,8 @@ pub enum Command {
     Reload(Reload),
     Clean(Clean),
     PrintOutput(PrintOutput),
-    Adjust(Adjust)
+    Adjust(Adjust),
+    Config(Config)
 }
 
 /// runs senscale
@@ -63,3 +64,8 @@ pub struct Adjust {
     #[argh(positional)]
     pub process: PathBuf
 }
+
+/// prints the config file path and creates the file if it doesn't exist
+#[derive(FromArgs)]
+#[argh(subcommand, name = "config")]
+pub struct Config {}

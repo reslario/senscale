@@ -28,7 +28,8 @@ fn run() -> Result {
         cli::Command::Reload(_) => wrap::reload()?,
         cli::Command::Clean(_) => wrap::clean(),
         cli::Command::PrintOutput(_) => wrap::print_output()?,
-        cli::Command::Adjust(args) => wrap::adjust(args.process)?
+        cli::Command::Adjust(args) => wrap::adjust(args.process)?,
+        cli::Command::Config(_) => wrap::config()?
     };
 
     Ok(())

@@ -99,8 +99,7 @@ impl Default for Entry {
 }
 
 pub fn read_config() -> Result<Config> {
-    let dir = config_dir()?;
-    let file = dir.file();
+    let file = config_dir()?.file();
 
     if file.exists() {
         let yaml = File::open(file)?;
@@ -108,11 +107,18 @@ pub fn read_config() -> Result<Config> {
         serde_yaml::from_reader(BufReader::new(yaml))
             .map_err(<_>::into)
     } else {
-        fs::create_dir_all(&*dir)?;
-        let config = Config::default();
-        write_config(&config, BufWriter::new(File::create(file)?))?;
-        Ok(config)
+        create_config(file)
     }
+}
+
+pub fn create_config(file: impl AsRef<Path>) -> Result<Config> {
+    if let Some(dir) = file.as_ref().parent() {
+        fs::create_dir_all(dir)?
+    }
+
+    let config = Config::default();
+    write_config(&config, BufWriter::new(File::create(file)?))?;
+    Ok(config)
 }
 
 const CFG_HEADER: &str = include_str!("./cfg_header.yaml");
