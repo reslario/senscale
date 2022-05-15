@@ -31,7 +31,7 @@ pub trait ThreadMessage: Sized {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 #[repr(usize)]
 pub enum Server {
     Stop,
@@ -60,7 +60,7 @@ impl ThreadMessage for Server {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 #[repr(usize)]
 pub enum Client {
     Running { msg_thread: u32 },
@@ -138,4 +138,70 @@ pub fn iter<T: ThreadMessage>() -> impl Iterator<Item = T> {
 
         None
     })
+}
+
+#[cfg(test)]
+mod test {
+    use {
+        super::*,
+        crate::winutil::current_thread_id,
+        std::{
+            thread,
+            sync::mpsc
+        },
+    };
+
+    #[test]
+    fn send_and_receive() {
+        let current = current_thread_id();
+        let client = Client::Running { msg_thread: current };
+        let server = Server::Reload { msg_thread: 21 };
+
+        let (tx, rx) = mpsc::channel();
+
+        let thread = thread::spawn(move || {
+            tx.send(current_thread_id()).unwrap();
+            assert_eq!(Some(client), wait());
+            server.send(current).unwrap();
+        });
+
+        let thread_id = rx.recv().unwrap();
+        client.send(thread_id).unwrap();
+        thread.join().unwrap();
+
+        assert_eq!(Some(server), wait())
+    }
+
+    #[test]
+    fn iter() {
+        let current = current_thread_id();
+        let client = [
+            Client::Printed,
+            Client::Running { msg_thread: current }
+        ];
+        let server = [
+            Server::Stop,
+            Server::Reload { msg_thread: 21 }
+        ];
+
+        let thread = thread::spawn(move || {
+            for msg in client {
+                msg.send(current).unwrap();
+            }
+
+            for msg in server {
+                msg.send(current).unwrap();
+            }
+        });
+
+        fn assert_received<T, const N: usize>(messages: [T; N])
+        where T: ThreadMessage + PartialEq + std::fmt::Debug {
+            assert_eq!(super::iter().take(messages.len()).collect::<Vec<T>>(), messages)
+        }
+
+        assert_received(client);
+        assert_received(server);
+
+        thread.join().unwrap();
+    }
 }
