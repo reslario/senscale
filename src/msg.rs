@@ -117,17 +117,22 @@ unsafe fn read_message<T: ThreadMessage>(read: impl Fn(*mut MSG) -> i32) -> Opti
 pub fn iter<T: ThreadMessage>() -> impl Iterator<Item = T> {
     let mut msg = MaybeUninit::uninit();
 
+    let dispatch = |msg| unsafe {
+        TranslateMessage(&msg);
+        DispatchMessageA(&msg);
+    };
+
     std::iter::from_fn(move || {
         while unsafe { GetMessageA(msg.as_mut_ptr(), std::ptr::null_mut(), MIN, MAX) > 0 } {
             let msg = unsafe { msg.assume_init() };
 
             if msg.message == WM_COMMAND {
-                return T::try_from(msg.wParam, msg.lParam)
-            } else {
-                unsafe {
-                    TranslateMessage(&msg);
-                    DispatchMessageA(&msg);
+                match T::try_from(msg.wParam, msg.lParam) {
+                    msg @ Some(_) => return msg,
+                    None => dispatch(msg)
                 }
+            } else {
+                dispatch(msg)
             }
         }
 
