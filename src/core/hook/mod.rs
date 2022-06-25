@@ -140,3 +140,28 @@ unsafe extern "system" fn on_visibility_changed(
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn hooks_lifecycle() {
+        let set_hooks = || Hooks::set(
+            <_>::default(),
+            Driver::dummy().unwrap(),
+            |_, _, _| {}
+        );
+
+        let hooks = set_hooks().unwrap();
+
+        assert!(!hooks.focus.is_null());
+        assert!(!hooks.visibility.is_null());
+
+        assert!(set_hooks().is_none());
+
+        drop(hooks);
+
+        assert!(State::get().is_none())
+    }
+}

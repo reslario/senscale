@@ -40,6 +40,15 @@ impl Driver {
             Ok(())
         }
     }
+
+    #[cfg(test)]
+    pub fn dummy() -> io::Result<Driver> {
+        File::open(std::env::current_exe()?)
+            .map(|handle| Driver {
+                sensitivity: f64::NAN,
+                handle
+            })
+    }
 }
 
 fn rawaccel_file_error(e: io::Error) -> io::Error {
