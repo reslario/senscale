@@ -81,8 +81,9 @@ impl Drop for Hooks {
         unsafe {
             UnhookWinEvent(self.focus);
             UnhookWinEvent(self.visibility);
-            State::get().take();
         }
+
+        State::get().take();
     }
 }
 
