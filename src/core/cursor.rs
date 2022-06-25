@@ -1,5 +1,5 @@
 use {
-    crate::winutil::uninit_sized,
+    crate::windows::util::uninit_sized,
     winapi::um::winuser::{CURSORINFO, GetCursorInfo}
 };
 

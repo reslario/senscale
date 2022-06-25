@@ -2,7 +2,7 @@ use {
     winapi::um::winbase::{CREATE_NEW_PROCESS_GROUP, DETACHED_PROCESS},
     crate::{
         Result,
-        winutil::current_thread_id,
+        windows::thread,
         msg::{self, ThreadMessage},
         cfg::{self, EditableConfig}
     },
@@ -18,8 +18,12 @@ use {
 
 pub fn run() -> io::Result<()> {
     if instance_file().exists() {
-        println!("already running");
-        return Ok(())
+        if already_running()? {
+            println!("already running");
+            return Ok(())
+        } else {
+            clean()
+        }
     }
 
     let mut child = Child::spawn()?;
@@ -39,7 +43,7 @@ impl Child {
             .arg("run")
             .arg("--foreground")
             .arg("--parent-thread")
-            .arg(current_thread_id().to_string())
+            .arg(thread::current_id().to_string())
             .stderr(output_file_write()?)
             .creation_flags(CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS)
             .spawn()?;
@@ -118,8 +122,6 @@ impl Child {
     }
 }
 
-
-
 pub fn stop() -> io::Result<()> {
     Child::load()?.send(msg::Server::Stop)?;
     clean();
@@ -128,7 +130,7 @@ pub fn stop() -> io::Result<()> {
 
 pub fn reload() -> io::Result<()> {
     let mut child = Child::load()?;
-    child.send(msg::Server::Reload { msg_thread: current_thread_id() })?;
+    child.send(msg::Server::Reload { msg_thread: thread::current_id() })?;
     child.wait_for_output()?;
     child.save()
 }
@@ -222,6 +224,15 @@ pub fn config() -> Result {
     }
     print!("{}", file.display());
     Ok(())
+}
+
+fn already_running() -> io::Result<bool> {
+    let child = Child::load()?;
+
+    Ok(match thread::process_exe_path(child.thread_id) {
+        Some(exe) => exe? == env::current_exe()?,
+        None => false
+    })
 }
 
 #[cfg(test)]

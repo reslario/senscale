@@ -6,8 +6,8 @@ use {
         path::Path
     },
     crate::{
+        windows::thread,
         cfg::{self, Config},
-        winutil::current_thread_id,
         msg::{self, ThreadMessage}
     }
 };
@@ -19,7 +19,7 @@ mod driver;
 pub fn run(parent_thread: Option<u32>) -> io::Result<()> {
     let Init { config, driver } = match parent_thread {
         Some(thread) => {
-            msg::Client::Running { msg_thread: current_thread_id() }
+            msg::Client::Running { msg_thread: thread::current_id() }
                 .send(thread)?;
 
             match init() {

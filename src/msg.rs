@@ -1,9 +1,9 @@
 use {
+    crate::windows::util::validate,
     std::{
         io,
         mem::MaybeUninit
     },
-    crate::winutil::validate,
     winapi::{
         shared::windef::HWND,
         um::winuser::{
@@ -144,7 +144,7 @@ pub fn iter<T: ThreadMessage>() -> impl Iterator<Item = T> {
 mod test {
     use {
         super::*,
-        crate::winutil::current_thread_id,
+        crate::windows::thread as win_thread,
         std::{
             thread,
             sync::mpsc
@@ -153,14 +153,14 @@ mod test {
 
     #[test]
     fn send_and_receive() {
-        let current = current_thread_id();
+        let current = win_thread::current_id();
         let client = Client::Running { msg_thread: current };
         let server = Server::Reload { msg_thread: 21 };
 
         let (tx, rx) = mpsc::channel();
 
         let thread = thread::spawn(move || {
-            tx.send(current_thread_id()).unwrap();
+            tx.send(win_thread::current_id()).unwrap();
             assert_eq!(Some(client), wait());
             server.send(current).unwrap();
         });
@@ -174,7 +174,7 @@ mod test {
 
     #[test]
     fn iter() {
-        let current = current_thread_id();
+        let current = win_thread::current_id();
         let client = [
             Client::Printed,
             Client::Running { msg_thread: current }

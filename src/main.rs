@@ -5,7 +5,7 @@ mod cli;
 mod wrap;
 mod core;
 mod msg;
-mod winutil;
+mod windows;
 
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 

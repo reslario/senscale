@@ -2,36 +2,26 @@ use {
     state::State,
     std::{
         ptr,
-        ffi::OsString,
         path::{PathBuf, Path},
-        os::windows::ffi::OsStringExt
     },
     crate::{
+        windows,
         cfg::Config,
         core::driver::Driver
     },
     winapi::{
-        shared::{
-            minwindef::MAX_PATH,
-            windef::{HWND, HWINEVENTHOOK}
-        },
-        um::{
-            handleapi::CloseHandle,
-            processthreadsapi::OpenProcess,
-            winbase::QueryFullProcessImageNameW,
-            winnt::PROCESS_QUERY_LIMITED_INFORMATION,
-            winuser::{
-                OBJID_CURSOR,
-                CHILDID_SELF,
-                UnhookWinEvent,
-                SetWinEventHook,
-                EVENT_OBJECT_HIDE,
-                EVENT_OBJECT_SHOW,
-                WINEVENT_OUTOFCONTEXT,
-                WINEVENT_SKIPOWNPROCESS,
-                EVENT_SYSTEM_FOREGROUND,
-                GetWindowThreadProcessId
-            }
+        shared::windef::{HWND, HWINEVENTHOOK},
+        um::winuser::{
+            OBJID_CURSOR,
+            CHILDID_SELF,
+            UnhookWinEvent,
+            SetWinEventHook,
+            EVENT_OBJECT_HIDE,
+            EVENT_OBJECT_SHOW,
+            WINEVENT_OUTOFCONTEXT,
+            WINEVENT_SKIPOWNPROCESS,
+            EVENT_SYSTEM_FOREGROUND,
+            GetWindowThreadProcessId
         }
     }
 };
@@ -102,9 +92,9 @@ pub struct Process {
 }
 
 impl Process {
-    fn new(path: &[u16]) -> Process {
+    fn new(path: PathBuf) -> Process {
         Process {
-            path: OsString::from_wide(path).into(),
+            path,
             cursor_hidden: None
         }
     }
@@ -123,15 +113,11 @@ unsafe extern "system" fn on_focus_changed(
     _event_thread: u32,
     _event_time: u32
 ) {
-    let mut buf = [0; MAX_PATH];
     let mut proc = 0;
     GetWindowThreadProcessId(window, &mut proc);
-    let proc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false.into(), proc);
-    let mut end = MAX_PATH as _;
-    QueryFullProcessImageNameW(proc, 0, buf.as_mut_ptr(), &mut end);
-    CloseHandle(proc);
+    let path = windows::process::exe_path(proc).unwrap_or_default();
 
-    let process = Process::new(&buf[..end as usize]);
+    let process = Process::new(path);
     
     if let Some(state) = State::get().as_mut() {
         state.set_focus(process)

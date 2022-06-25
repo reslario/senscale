@@ -16,9 +16,3 @@ pub unsafe fn uninit_sized<T>(size_member: fn(&mut T) -> &mut u32) -> T {
     *size_member(&mut info) = size_of::<T>() as _;
     info
 }
-
-pub fn current_thread_id() -> u32 {
-    unsafe { 
-        winapi::um::processthreadsapi::GetCurrentThreadId()
-    }
-}

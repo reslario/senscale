@@ -5,7 +5,7 @@ authors = ["reslario <reslario.code@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-winapi = { version = "0.3.9", features = ["winioctl", "ioapiset", "winuser", "tlhelp32", "processthreadsapi", "handleapi", "winbase", "minwindef"] }
+winapi = { version = "0.3.9", features = ["winioctl", "ioapiset", "winuser", "tlhelp32", "processthreadsapi", "handleapi", "winbase", "minwindef", "winnt"] }
 serde_yaml = "0.8.24"
 serde = { version = "1.0.137", features = ["derive"] }
 directories = "4.0.1"
