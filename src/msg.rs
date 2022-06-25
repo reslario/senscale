@@ -31,61 +31,57 @@ pub trait ThreadMessage: Sized {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-#[repr(usize)]
-pub enum Server {
-    Stop,
-    Reload { msg_thread: u32 }
-}
-
-impl Server {
-    const STOP: usize = '🛑' as _;
-    const RELOAD: usize = '♻' as _;
-}
-
-impl ThreadMessage for Server {
-    fn try_from(ident: usize, param: isize) -> Option<Self> {
-        match ident {
-            Server::STOP => Server::Stop,
-            Server::RELOAD => Server::Reload { msg_thread: param as _ },
-            _ => return None
-        }.into()
-    }
-
-    fn as_raw(&self) -> (usize, isize) {
-        match self {
-            Server::Stop => (Server::STOP, 0),
-            Server::Reload { msg_thread } => (Server::RELOAD, *msg_thread as _)
+macro_rules! message {
+    ($name:ident {
+        $($variant:ident $({ $field:ident : $field_type:path })? = $tag:literal),*
+    }) => {
+        #[derive(Debug, Copy, Clone, PartialEq)]
+        #[repr(usize)]
+        pub enum $name {
+            $(
+                $variant $({ $field: $field_type })?
+            ),*
         }
-    }
-}
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-#[repr(usize)]
-pub enum Client {
-    Running { msg_thread: u32 },
-    Printed
-}
+        impl ThreadMessage for $name {
+            #[allow(non_upper_case_globals)] 
+            fn try_from(ident: usize, param: isize) -> Option<Self> {
+                $(
+                    const $variant: usize = $tag as _;
+                )*
 
-impl Client {
-    const RUNNING: usize = '🏃' as _;
-    const PRINTED: usize = '🖨' as _;
-}
-
-impl ThreadMessage for Client {
-    fn try_from(ident: usize, param: isize) -> Option<Self> {
-        match ident {
-            Client::RUNNING => Client::Running { msg_thread: param as _ },
-            Client::PRINTED => Client::Printed,
-            _ => return None
-        }.into()
-    }
-
-    fn as_raw(&self) -> (usize, isize) {
-        match self {
-            Client::Running { msg_thread: main_thread } => (Client::RUNNING, *main_thread as _),
-            Client::Printed => (Client::PRINTED, 0),
+                match ident {
+                    $(
+                        $variant => $name::$variant $({ $field: param as _ })?
+                    ),*,
+                    _ => return None
+                }.into()
+            }
+        
+            fn as_raw(&self) -> (usize, isize) {
+                match self {
+                    $(
+                        // the `- 0` at the end is a hack to provide a default value of
+                        // `0` in case no `$field` is present
+                        $name::$variant $({ $field })? => ($tag as _, $(*$field as isize)? - 0)
+                    ),*
+                }
+            }
         }
+    };
+}
+
+message! {
+    Server {
+        Stop = '🛑',
+        Reload { msg_thread: u32 } = '♻'
+    }
+}
+
+message! {
+    Client {
+        Running { msg_thread: u32 } = '🏃',
+        Printed = '🖨'
     }
 }
 
