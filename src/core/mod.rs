@@ -28,7 +28,7 @@ pub fn run(parent_thread: Option<u32>) -> io::Result<()> {
                     init
                 },
                 Err(e) => {
-                    eprint!("{e}");
+                    eprint!("initialization error: {e}");
                     return msg::Client::Printed.send(thread)
                 }
             }
