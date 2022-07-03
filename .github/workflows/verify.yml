@@ -61,7 +61,7 @@ jobs:
         
         with:
           command: fmt
-          args: +nightly --all -- --check
+          args: --all -- --check
 
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
