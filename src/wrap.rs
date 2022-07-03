@@ -229,6 +229,8 @@ pub fn config() -> Result {
 fn already_running() -> io::Result<bool> {
     let child = Child::load()?;
 
+    if child.thread_id == thread::current_id() { return Ok(false) }
+
     Ok(match thread::process_exe_path(child.thread_id) {
         Some(exe) => exe? == env::current_exe()?,
         None => false
