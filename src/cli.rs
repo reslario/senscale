@@ -1,13 +1,10 @@
-use {
-    argh::FromArgs,
-    std::path::PathBuf
-};
+use {argh::FromArgs, std::path::PathBuf};
 
-/// scales your mouse sensitivity on a per-process basis. 
+/// scales your mouse sensitivity on a per-process basis.
 #[derive(FromArgs)]
 pub struct Args {
     #[argh(subcommand)]
-    pub command: Command
+    pub command: Command,
 }
 
 #[derive(FromArgs)]
@@ -19,7 +16,7 @@ pub enum Command {
     Clean(Clean),
     PrintOutput(PrintOutput),
     Adjust(Adjust),
-    Config(Config)
+    Config(Config),
 }
 
 /// runs senscale
@@ -32,7 +29,7 @@ pub struct Run {
     /// sets the thread used for message passing
     /// (used internally when running in the background)
     #[argh(option)]
-    pub parent_thread: Option<u32>
+    pub parent_thread: Option<u32>,
 }
 
 /// stops senscale
@@ -56,13 +53,14 @@ pub struct Clean {}
 #[argh(subcommand, name = "print-output")]
 pub struct PrintOutput {}
 
-/// lets you easily adjust a process' sensitivity until you've found the right one
+/// lets you easily adjust a process' sensitivity until you've found the right
+/// one
 #[derive(FromArgs)]
 #[argh(subcommand, name = "adjust")]
 pub struct Adjust {
     /// the .exe of the process
     #[argh(positional)]
-    pub process: PathBuf
+    pub process: PathBuf,
 }
 
 /// prints the config file path and creates the file if it doesn't exist

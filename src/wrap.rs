@@ -1,19 +1,19 @@
 use {
-    winapi::um::winbase::{CREATE_NEW_PROCESS_GROUP, DETACHED_PROCESS},
     crate::{
-        Result,
-        windows::thread,
+        cfg::{self, EditableConfig},
         msg::{self, ThreadMessage},
-        cfg::{self, EditableConfig}
+        windows::thread,
+        Result,
     },
     std::{
         env,
-        process::Command,
-        path::{Path, PathBuf},
         fs::{self, File, OpenOptions},
+        io::{self, BufRead, BufReader, BufWriter, Read, Seek, SeekFrom, Write},
         os::windows::process::CommandExt,
-        io::{self, Read, Write, Seek, SeekFrom, BufRead, BufReader, BufWriter}
-    }
+        path::{Path, PathBuf},
+        process::Command,
+    },
+    winapi::um::winbase::{CREATE_NEW_PROCESS_GROUP, DETACHED_PROCESS},
 };
 
 pub fn run() -> io::Result<()> {
@@ -34,7 +34,7 @@ pub fn run() -> io::Result<()> {
 #[derive(Debug, PartialEq, Eq)]
 struct Child {
     thread_id: u32,
-    output_pos: u64
+    output_pos: u64,
 }
 
 impl Child {
@@ -53,13 +53,13 @@ impl Child {
         } else {
             return Err(io::Error::new(
                 io::ErrorKind::NotConnected,
-                "child process did not respond"
+                "child process did not respond",
             ))
         };
 
         Ok(Child {
             thread_id,
-            output_pos: 0
+            output_pos: 0,
         })
     }
 
@@ -76,10 +76,10 @@ impl Child {
         let (left, right) = bytes.split_at(4);
         a.copy_from_slice(left);
         b.copy_from_slice(right);
-        
+
         Child {
             thread_id: u32::from_le_bytes(a),
-            output_pos: u64::from_le_bytes(b)
+            output_pos: u64::from_le_bytes(b),
         }
     }
 
@@ -91,8 +91,7 @@ impl Child {
     fn load() -> io::Result<Child> {
         let mut bytes = [0; 12];
 
-        let mut file = File::open(instance_file())
-            .map_err(instance_file_error)?;
+        let mut file = File::open(instance_file()).map_err(instance_file_error)?;
 
         file.read_exact(&mut bytes)?;
 
@@ -103,15 +102,15 @@ impl Child {
         let mut stdout = io::stdout();
         let mut output = output_file_read()?;
         output.seek(SeekFrom::Start(self.output_pos))?;
-    
+
         self.output_pos += io::copy(&mut output, &mut stdout)?;
-    
+
         Ok(())
     }
 
     fn wait_for_output(&mut self) -> io::Result<()> {
         if let Some(msg::Client::Printed { .. }) = msg::wait() {
-            self.print_output() 
+            self.print_output()
         } else {
             Ok(())
         }
@@ -130,7 +129,9 @@ pub fn stop() -> io::Result<()> {
 
 pub fn reload() -> io::Result<()> {
     let mut child = Child::load()?;
-    child.send(msg::Server::Reload { msg_thread: thread::current_id() })?;
+    child.send(msg::Server::Reload {
+        msg_thread: thread::current_id(),
+    })?;
     child.wait_for_output()?;
     child.save()
 }
@@ -138,7 +139,7 @@ pub fn reload() -> io::Result<()> {
 pub fn clean() {
     let _ = (
         fs::remove_file(instance_file()),
-        fs::remove_file(output_file_path())
+        fs::remove_file(output_file_path()),
     );
 }
 
@@ -189,7 +190,7 @@ pub fn adjust(process: PathBuf) -> Result {
     {
         match res {
             Ok(sens) => set_sens(&config, process.clone(), sens)?,
-            Err(e) => eprintln!("failed to parse as number: {e}")
+            Err(e) => eprintln!("failed to parse as number: {e}"),
         }
     }
 
@@ -197,7 +198,8 @@ pub fn adjust(process: PathBuf) -> Result {
 }
 
 fn set_sens(config_path: impl AsRef<Path>, process: PathBuf, sens: f64) -> Result {
-    let mut config: EditableConfig = serde_yaml::from_reader(BufReader::new(File::open(&config_path)?))?;
+    let mut config: EditableConfig =
+        serde_yaml::from_reader(BufReader::new(File::open(&config_path)?))?;
 
     config
         .processes
@@ -229,11 +231,13 @@ pub fn config() -> Result {
 fn already_running() -> io::Result<bool> {
     let child = Child::load()?;
 
-    if child.thread_id == thread::current_id() { return Ok(false) }
+    if child.thread_id == thread::current_id() {
+        return Ok(false)
+    }
 
     Ok(match thread::process_exe_path(child.thread_id) {
         Some(exe) => exe? == env::current_exe()?,
-        None => false
+        None => false,
     })
 }
 
@@ -248,24 +252,31 @@ mod test {
 
         assert_eq!(
             [255, 255, 255, 255, 128, 128, 128, 128, 128, 128, 128, 128],
-            Child { thread_id, output_pos }.to_bytes()
+            Child {
+                thread_id,
+                output_pos
+            }
+            .to_bytes()
         )
     }
 
     #[test]
     fn child_from_bytes() {
         assert_eq!(
-            Child { thread_id: u32::MAX, output_pos: 9259542123273814144 },
+            Child {
+                thread_id: u32::MAX,
+                output_pos: 9259542123273814144
+            },
             Child::from_bytes([255, 255, 255, 255, 128, 128, 128, 128, 128, 128, 128, 128])
         )
     }
 
     #[test]
     fn child_roundtrip() {
-        let child = Child { thread_id: 31267374, output_pos: 9613725632561 };
-        assert_eq!(
-            child,
-            Child::from_bytes(child.to_bytes())
-        )
+        let child = Child {
+            thread_id: 31267374,
+            output_pos: 9613725632561,
+        };
+        assert_eq!(child, Child::from_bytes(child.to_bytes()))
     }
 }

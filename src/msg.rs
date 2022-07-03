@@ -1,20 +1,17 @@
 use {
     crate::windows::util::validate,
-    std::{
-        io,
-        mem::MaybeUninit
-    },
+    std::{io, mem::MaybeUninit},
     winapi::{
         shared::windef::HWND,
         um::winuser::{
+            DispatchMessageA,
+            GetMessageA,
+            PostThreadMessageA,
+            TranslateMessage,
             MSG,
             WM_COMMAND,
-            GetMessageA,
-            TranslateMessage,
-            DispatchMessageA,
-            PostThreadMessageA
-        }
-    }
+        },
+    },
 };
 
 const WIN: HWND = -1_isize as _;
@@ -44,7 +41,7 @@ macro_rules! message {
         }
 
         impl ThreadMessage for $name {
-            #[allow(non_upper_case_globals)] 
+            #[allow(non_upper_case_globals)]
             fn try_from(ident: usize, param: isize) -> Option<Self> {
                 $(
                     const $variant: usize = $tag as _;
@@ -57,7 +54,7 @@ macro_rules! message {
                     _ => return None
                 }.into()
             }
-        
+
             fn as_raw(&self) -> (usize, isize) {
                 match self {
                     $(
@@ -86,17 +83,11 @@ message! {
 }
 
 fn send_message(thread: u32, ident: usize, param: isize) -> io::Result<()> {
-    validate(
-        unsafe {
-            PostThreadMessageA(thread, WM_COMMAND, ident, param)
-        }
-    )
+    validate(unsafe { PostThreadMessageA(thread, WM_COMMAND, ident, param) })
 }
 
 pub fn wait<T: ThreadMessage>() -> Option<T> {
-    unsafe {
-        read_message(|msg| GetMessageA(msg, WIN, MIN, MAX))
-    }
+    unsafe { read_message(|msg| GetMessageA(msg, WIN, MIN, MAX)) }
 }
 
 unsafe fn read_message<T: ThreadMessage>(read: impl Fn(*mut MSG) -> i32) -> Option<T> {
@@ -107,7 +98,6 @@ unsafe fn read_message<T: ThreadMessage>(read: impl Fn(*mut MSG) -> i32) -> Opti
     (msg.message == WM_COMMAND)
         .then(|| T::try_from(msg.wParam, msg.lParam))
         .flatten()
-
 }
 
 pub fn iter<T: ThreadMessage>() -> impl Iterator<Item = T> {
@@ -125,7 +115,7 @@ pub fn iter<T: ThreadMessage>() -> impl Iterator<Item = T> {
             if msg.message == WM_COMMAND {
                 match T::try_from(msg.wParam, msg.lParam) {
                     msg @ Some(_) => return msg,
-                    None => dispatch(msg)
+                    None => dispatch(msg),
                 }
             } else {
                 dispatch(msg)
@@ -141,16 +131,15 @@ mod test {
     use {
         super::*,
         crate::windows::thread as win_thread,
-        std::{
-            thread,
-            sync::mpsc
-        },
+        std::{sync::mpsc, thread},
     };
 
     #[test]
     fn send_and_receive() {
         let current = win_thread::current_id();
-        let client = Client::Running { msg_thread: current };
+        let client = Client::Running {
+            msg_thread: current,
+        };
         let server = Server::Reload { msg_thread: 21 };
 
         let (tx, rx) = mpsc::channel();
@@ -171,14 +160,10 @@ mod test {
     #[test]
     fn iter() {
         let current = win_thread::current_id();
-        let client = [
-            Client::Printed,
-            Client::Running { msg_thread: current }
-        ];
-        let server = [
-            Server::Stop,
-            Server::Reload { msg_thread: 21 }
-        ];
+        let client = [Client::Printed, Client::Running {
+            msg_thread: current,
+        }];
+        let server = [Server::Stop, Server::Reload { msg_thread: 21 }];
 
         let thread = thread::spawn(move || {
             for msg in client {
@@ -191,8 +176,13 @@ mod test {
         });
 
         fn assert_received<T, const N: usize>(messages: [T; N])
-        where T: ThreadMessage + PartialEq + std::fmt::Debug {
-            assert_eq!(super::iter().take(messages.len()).collect::<Vec<T>>(), messages)
+        where
+            T: ThreadMessage + PartialEq + std::fmt::Debug,
+        {
+            assert_eq!(
+                super::iter().take(messages.len()).collect::<Vec<T>>(),
+                messages
+            )
         }
 
         assert_received(client);
