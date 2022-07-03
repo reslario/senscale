@@ -32,7 +32,7 @@ macro_rules! message {
     ($name:ident {
         $($variant:ident $({ $field:ident : $field_type:path })? = $tag:literal),*
     }) => {
-        #[derive(Debug, Copy, Clone, PartialEq)]
+        #[derive(Debug, Copy, Clone, PartialEq, Eq)]
         #[repr(usize)]
         pub enum $name {
             $(
