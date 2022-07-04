@@ -145,6 +145,9 @@ mod test {
         let (tx, rx) = mpsc::channel();
 
         let thread = thread::spawn(move || {
+            // force the message queue to be created
+            let _ = client.send(0);
+
             tx.send(win_thread::current_id()).unwrap();
             assert_eq!(Some(client), wait());
             server.send(current).unwrap();
