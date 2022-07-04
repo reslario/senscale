@@ -1,43 +1,41 @@
 use {
-    hook::Hooks,
-    driver::Driver,
-    std::{
-        io,
-        path::Path
-    },
     crate::{
-        windows::thread,
         cfg::{self, Config},
-        msg::{self, ThreadMessage}
-    }
+        msg::{self, ThreadMessage},
+        windows::thread,
+    },
+    driver::Driver,
+    hook::Hooks,
+    std::{io, path::Path},
 };
 
-mod hook;
 mod cursor;
 mod driver;
+mod hook;
 
 pub fn run(parent_thread: Option<u32>) -> io::Result<()> {
     let Init { config, driver } = match parent_thread {
         Some(thread) => {
-            msg::Client::Running { msg_thread: thread::current_id() }
-                .send(thread)?;
+            msg::Client::Running {
+                msg_thread: thread::current_id(),
+            }
+            .send(thread)?;
 
             match init() {
                 Ok(init) => {
                     msg::Client::Printed.send(thread)?;
                     init
-                },
+                }
                 Err(e) => {
                     eprint!("initialization error: {e}");
                     return msg::Client::Printed.send(thread)
                 }
             }
-        },
-        None => init()?
+        }
+        None => init()?,
     };
 
-    let mut hook = Hooks::set(config, driver, on_focus_changed)
-        .expect("hooks already set");
+    let mut hook = Hooks::set(config, driver, on_focus_changed).expect("hooks already set");
 
     for msg in msg::iter() {
         match msg {
@@ -54,7 +52,7 @@ pub fn run(parent_thread: Option<u32>) -> io::Result<()> {
 
 struct Init {
     config: cfg::Config,
-    driver: Driver
+    driver: Driver,
 }
 
 fn init() -> io::Result<Init> {
@@ -70,7 +68,7 @@ fn read_config() -> Config {
         .unwrap_or_default();
 
     eprintln!("default sensitivity = {}", config.default_sensitivity);
-    
+
     if !config.processes.is_empty() {
         eprintln!("scaling for:");
 
@@ -86,14 +84,10 @@ fn on_focus_changed(config: &Config, driver: &mut Driver, process: &hook::Proces
     let res = config
         .processes
         .get(process.exe())
-        .or_else(|| config
-            .processes
-            .get(Path::new(process.exe().file_name()?))
-        )
+        .or_else(|| config.processes.get(Path::new(process.exe().file_name()?)))
         .filter(|entry| entry.cursor_matches(process))
         .map(|entry| driver.set_sens(entry.sensitivity))
         .unwrap_or_else(|| driver.set_sens(config.default_sensitivity));
-        
 
     if let Err(e) = res {
         eprint!("{e}")
@@ -102,7 +96,6 @@ fn on_focus_changed(config: &Config, driver: &mut Driver, process: &hook::Proces
 
 impl cfg::Entry {
     fn cursor_matches(&self, process: &hook::Process) -> bool {
-        !self.only_if_cursor_hidden 
-            || process.cursor_hidden.unwrap_or_else(cursor::hidden)
+        !self.only_if_cursor_hidden || process.cursor_hidden.unwrap_or_else(cursor::hidden)
     }
 }

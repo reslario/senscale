@@ -2,43 +2,43 @@ use {
     crate::Result,
     directories::ProjectDirs,
     linked_hash_map::LinkedHashMap,
-    serde::{Serialize, Deserialize},
+    serde::{Deserialize, Serialize},
     std::{
-        fs::{self, File},
         collections::HashMap,
+        fs::{self, File},
+        io::{BufReader, BufWriter, Write},
         path::{Path, PathBuf},
-        io::{Write, BufWriter, BufReader},
-    }
+    },
 };
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GenericConfig<E> {
     #[serde(default = "default_sensitivity")]
     pub default_sensitivity: f64,
-    pub processes: E
+    pub processes: E,
 }
 
 pub type Config = GenericConfig<HashMap<PathBuf, Entry>>;
 pub type EditableConfig = GenericConfig<LinkedHashMap<PathBuf, Entry>>;
 
-impl <E: Default> Default for GenericConfig<E> {
+impl<E: Default> Default for GenericConfig<E> {
     fn default() -> Self {
         GenericConfig {
             default_sensitivity: default_sensitivity(),
-            processes: <_>::default()
+            processes: <_>::default(),
         }
     }
 }
 
 pub const fn default_sensitivity() -> f64 {
-    1.0 
+    1.0
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum ConfigEntry {
     Short(f64),
-    Long(Entry)
+    Long(Entry),
 }
 
 impl From<ConfigEntry> for Entry {
@@ -47,8 +47,8 @@ impl From<ConfigEntry> for Entry {
             ConfigEntry::Long(entry) => entry,
             ConfigEntry::Short(sensitivity) => Entry {
                 sensitivity,
-                only_if_cursor_hidden: <_>::default()
-            }
+                only_if_cursor_hidden: <_>::default(),
+            },
         }
     }
 }
@@ -58,7 +58,7 @@ impl From<ConfigEntry> for Entry {
 pub struct Entry {
     pub sensitivity: f64,
     #[serde(default)]
-    pub only_if_cursor_hidden: bool
+    pub only_if_cursor_hidden: bool,
 }
 
 impl Entry {
@@ -69,19 +69,21 @@ impl Entry {
 
 impl Serialize for Entry {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where S: serde::Serializer {
+    where
+        S: serde::Serializer,
+    {
         if self.can_be_short() {
             ConfigEntry::Short(self.sensitivity).serialize(serializer)
         } else {
             #[derive(Serialize)]
             struct EntryProxy {
                 sensitivity: f64,
-                only_if_cursor_hidden: bool
+                only_if_cursor_hidden: bool,
             }
 
             let proxy = EntryProxy {
                 sensitivity: self.sensitivity,
-                only_if_cursor_hidden: self.only_if_cursor_hidden
+                only_if_cursor_hidden: self.only_if_cursor_hidden,
             };
 
             proxy.serialize(serializer)
@@ -93,7 +95,7 @@ impl Default for Entry {
     fn default() -> Self {
         Self {
             sensitivity: default_sensitivity(),
-            only_if_cursor_hidden: <_>::default()
+            only_if_cursor_hidden: <_>::default(),
         }
     }
 }
@@ -103,9 +105,8 @@ pub fn read_config() -> Result<Config> {
 
     if file.exists() {
         let yaml = File::open(file)?;
-        
-        serde_yaml::from_reader(BufReader::new(yaml))
-            .map_err(<_>::into)
+
+        serde_yaml::from_reader(BufReader::new(yaml)).map_err(<_>::into)
     } else {
         create_config(file)
     }
@@ -139,7 +140,7 @@ pub fn config_dir() -> Result<ConfigDir> {
 }
 
 pub struct ConfigDir {
-    dirs: ProjectDirs
+    dirs: ProjectDirs,
 }
 
 impl std::ops::Deref for ConfigDir {

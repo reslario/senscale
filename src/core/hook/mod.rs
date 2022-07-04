@@ -1,29 +1,25 @@
 use {
+    crate::{cfg::Config, core::driver::Driver, windows},
     state::State,
     std::{
+        path::{Path, PathBuf},
         ptr,
-        path::{PathBuf, Path},
-    },
-    crate::{
-        windows,
-        cfg::Config,
-        core::driver::Driver
     },
     winapi::{
-        shared::windef::{HWND, HWINEVENTHOOK},
+        shared::windef::{HWINEVENTHOOK, HWND},
         um::winuser::{
-            OBJID_CURSOR,
-            CHILDID_SELF,
-            UnhookWinEvent,
+            GetWindowThreadProcessId,
             SetWinEventHook,
+            UnhookWinEvent,
+            CHILDID_SELF,
             EVENT_OBJECT_HIDE,
             EVENT_OBJECT_SHOW,
+            EVENT_SYSTEM_FOREGROUND,
+            OBJID_CURSOR,
             WINEVENT_OUTOFCONTEXT,
             WINEVENT_SKIPOWNPROCESS,
-            EVENT_SYSTEM_FOREGROUND,
-            GetWindowThreadProcessId
-        }
-    }
+        },
+    },
 };
 
 mod state;
@@ -32,7 +28,7 @@ pub type Handler = fn(&Config, &mut Driver, &Process);
 
 pub struct Hooks {
     focus: HWINEVENTHOOK,
-    visibility: HWINEVENTHOOK
+    visibility: HWINEVENTHOOK,
 }
 
 impl Hooks {
@@ -45,7 +41,11 @@ impl Hooks {
 
         state.replace(State::new(config, driver, handler));
 
-        let focus = set_hook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, on_focus_changed);
+        let focus = set_hook(
+            EVENT_SYSTEM_FOREGROUND,
+            EVENT_SYSTEM_FOREGROUND,
+            on_focus_changed,
+        );
         let visibility = set_hook(EVENT_OBJECT_SHOW, EVENT_OBJECT_HIDE, on_visibility_changed);
 
         Hooks { focus, visibility }.into()
@@ -61,7 +61,7 @@ impl Hooks {
 fn set_hook(
     min: u32,
     max: u32,
-    handler: unsafe extern "system" fn(HWINEVENTHOOK, u32, HWND, i32, i32, thread: u32, time: u32)
+    handler: unsafe extern "system" fn(HWINEVENTHOOK, u32, HWND, i32, i32, thread: u32, time: u32),
 ) -> HWINEVENTHOOK {
     unsafe {
         SetWinEventHook(
@@ -71,7 +71,7 @@ fn set_hook(
             Some(handler),
             0,
             0,
-            WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS
+            WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
         )
     }
 }
@@ -89,14 +89,14 @@ impl Drop for Hooks {
 
 pub struct Process {
     path: PathBuf,
-    pub cursor_hidden: Option<bool>
+    pub cursor_hidden: Option<bool>,
 }
 
 impl Process {
     fn new(path: PathBuf) -> Process {
         Process {
             path,
-            cursor_hidden: None
+            cursor_hidden: None,
         }
     }
 
@@ -112,14 +112,14 @@ unsafe extern "system" fn on_focus_changed(
     _object: i32,
     _child: i32,
     _event_thread: u32,
-    _event_time: u32
+    _event_time: u32,
 ) {
     let mut proc = 0;
     GetWindowThreadProcessId(window, &mut proc);
     let path = windows::process::exe_path(proc).unwrap_or_default();
 
     let process = Process::new(path);
-    
+
     if let Some(state) = State::get().as_mut() {
         state.set_focus(process)
     }
@@ -132,7 +132,7 @@ unsafe extern "system" fn on_visibility_changed(
     object: i32,
     child: i32,
     _event_thread: u32,
-    _event_time: u32
+    _event_time: u32,
 ) {
     if object == OBJID_CURSOR && child == CHILDID_SELF {
         if let Some(state) = State::get().as_mut() {
@@ -147,11 +147,7 @@ mod test {
 
     #[test]
     fn hooks_lifecycle() {
-        let set_hooks = || Hooks::set(
-            <_>::default(),
-            Driver::dummy().unwrap(),
-            |_, _, _| {}
-        );
+        let set_hooks = || Hooks::set(<_>::default(), Driver::dummy().unwrap(), |_, _, _| {});
 
         let hooks = set_hooks().unwrap();
 

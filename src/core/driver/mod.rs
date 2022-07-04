@@ -3,15 +3,12 @@ mod write;
 
 use {
     settings::Settings,
-    std::{
-        io,
-        fs::File
-    }
+    std::{fs::File, io},
 };
 
 pub struct Driver {
     sensitivity: f64,
-    handle: File
+    handle: File,
 }
 
 impl Driver {
@@ -20,7 +17,7 @@ impl Driver {
             .map_err(rawaccel_file_error)
             .map(|handle| Driver {
                 sensitivity: f64::NAN,
-                handle 
+                handle,
             })
     }
 
@@ -28,13 +25,13 @@ impl Driver {
         // this is only meant to prevent setting the sensitivity
         // to the exact same value consecutively, so an exact
         // comparison is fine here
-        #[allow(clippy::float_cmp)] 
+        #[allow(clippy::float_cmp)]
         if sens != self.sensitivity {
             self.sensitivity = sens;
 
             let mut settings = Settings::default();
             settings.set_sens(sens);
-        
+
             write::write_settings(&self.handle, &mut settings)
         } else {
             Ok(())
@@ -43,11 +40,10 @@ impl Driver {
 
     #[cfg(test)]
     pub fn dummy() -> io::Result<Driver> {
-        File::open(std::env::current_exe()?)
-            .map(|handle| Driver {
-                sensitivity: f64::NAN,
-                handle
-            })
+        File::open(std::env::current_exe()?).map(|handle| Driver {
+            sensitivity: f64::NAN,
+            handle,
+        })
     }
 }
 

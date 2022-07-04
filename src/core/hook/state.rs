@@ -1,20 +1,20 @@
 use {
-    once_cell::sync::Lazy,
-    std::sync::{Mutex, MutexGuard},
     crate::{
         cfg::Config,
         core::{
             driver::Driver,
-            hook::{Process, Handler}
-        }
-    }
+            hook::{Handler, Process},
+        },
+    },
+    once_cell::sync::Lazy,
+    std::sync::{Mutex, MutexGuard},
 };
 
 pub struct State {
     pub config: Config,
     driver: Driver,
     handler: Handler,
-    focus: Option<Process>
+    focus: Option<Process>,
 }
 
 impl State {
@@ -23,7 +23,7 @@ impl State {
             config,
             driver,
             handler,
-            focus: None
+            focus: None,
         }
     }
 

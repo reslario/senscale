@@ -3,16 +3,18 @@ const MAX_DEV_ID_LEN: usize = 200;
 #[repr(C)]
 struct Vec2<T> {
     x: T,
-    y: T
+    y: T,
 }
 
-impl <T> Vec2<T> {
+impl<T> Vec2<T> {
     fn new(x: T, y: T) -> Vec2<T> {
         Vec2 { x, y }
     }
 
     fn both(val: T) -> Vec2<T>
-    where T: Clone {
+    where
+        T: Clone,
+    {
         Vec2::new(val.clone(), val)
     }
 }
@@ -27,7 +29,7 @@ enum AccelMode {
     NaturalGain,
     Power,
     Motivity,
-    NoAccel
+    NoAccel,
 }
 
 #[repr(C)]
@@ -67,7 +69,7 @@ pub struct Settings {
     domain_args: DomainArgs,
     range_weights: Vec2<f64>,
     time_min: f64,
-    device_id: [u16; MAX_DEV_ID_LEN]
+    device_id: [u16; MAX_DEV_ID_LEN],
 }
 
 impl Settings {
@@ -104,7 +106,7 @@ impl Default for Settings {
             },
             range_weights: Vec2::both(1.),
             time_min: 0.1,
-            device_id: [0; MAX_DEV_ID_LEN]
+            device_id: [0; MAX_DEV_ID_LEN],
         }
     }
 }
