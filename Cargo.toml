@@ -1,6 +1,6 @@
 [package]
 name = "senscale"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["reslario <reslario.code@gmail.com>"]
 edition = "2021"
 
