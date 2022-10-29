@@ -10,7 +10,7 @@ pub fn validate(result: i32) -> io::Result<()> {
 
 #[allow(clippy::uninit_assumed_init)]
 pub unsafe fn uninit_sized<T>(size_member: fn(&mut T) -> &mut u32) -> T {
-    use std::mem::{MaybeUninit, size_of};
+    use std::mem::{size_of, MaybeUninit};
 
     let mut value = MaybeUninit::<T>::uninit().assume_init();
     *size_member(&mut value) = size_of::<T>() as _;
@@ -30,11 +30,11 @@ mod test {
         struct Test {
             size: u32,
             #[allow(unused)]
-            whatever: u64
+            whatever: u64,
         }
 
         assert_eq!(
-            unsafe { super::uninit_sized::<Test>(|test| &mut test.size ) }.size,
+            unsafe { super::uninit_sized::<Test>(|test| &mut test.size) }.size,
             std::mem::size_of::<Test>() as u32
         )
     }
