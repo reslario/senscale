@@ -121,12 +121,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "once_cell"
-version = "1.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7709cef83f0c1f58f666e746a08b21e0085f7440fa6a29cc194d68aac97a4225"
-
-[[package]]
 name = "proc-macro2"
 version = "1.0.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -176,7 +170,6 @@ dependencies = [
  "argh",
  "directories",
  "linked-hash-map",
- "once_cell",
  "serde",
  "serde_yaml",
  "winapi",
