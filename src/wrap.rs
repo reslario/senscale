@@ -179,7 +179,6 @@ fn output_file_read() -> io::Result<File> {
 pub fn adjust(process: PathBuf) -> Result {
     let config = cfg::config_dir()?.file();
 
-    #[allow(clippy::significant_drop_in_scrutinee)]
     for res in io::stdin()
         .lock()
         .lines()
