@@ -1,7 +1,8 @@
 use {
     crate::{
         cfg::{self, Config},
-        msg::{self, ThreadMessage},
+        msg,
+        thread_id::ThreadId,
         windows::thread,
     },
     driver::Driver,
@@ -13,22 +14,21 @@ mod cursor;
 mod driver;
 mod hook;
 
-pub fn run(parent_thread: Option<u32>) -> io::Result<()> {
+pub fn run(parent_thread: Option<ThreadId>) -> io::Result<()> {
     let Init { config, driver } = match parent_thread {
         Some(thread) => {
-            msg::Client::Running {
+            thread.send(msg::Client::Running {
                 msg_thread: thread::current_id(),
-            }
-            .send(thread)?;
+            })?;
 
             match init() {
                 Ok(init) => {
-                    msg::Client::Printed.send(thread)?;
+                    thread.send(msg::Client::Printed)?;
                     init
                 }
                 Err(e) => {
                     eprint!("initialization error: {e}");
-                    return msg::Client::Printed.send(thread)
+                    return thread.send(msg::Client::Printed)
                 }
             }
         }
@@ -40,9 +40,15 @@ pub fn run(parent_thread: Option<u32>) -> io::Result<()> {
     for msg in msg::iter() {
         match msg {
             msg::Server::Stop => break,
-            msg::Server::Reload { msg_thread } => {
-                hook.set_config(read_config());
-                msg::Client::Printed.send(msg_thread)?
+            msg::Server::Reload { params } => {
+                let config = read_config();
+
+                if params.print {
+                    print_config(&config)
+                }
+
+                hook.set_config(config);
+                params.thread.send(msg::Client::Printed)?
             }
         }
     }
@@ -57,16 +63,19 @@ struct Init {
 
 fn init() -> io::Result<Init> {
     let config = read_config();
+    print_config(&config);
     let driver = Driver::new()?;
 
     Ok(Init { config, driver })
 }
 
 fn read_config() -> Config {
-    let config = cfg::read_config()
+    cfg::read_config()
         .map_err(|e| eprintln!("config error: {e}"))
-        .unwrap_or_default();
+        .unwrap_or_default()
+}
 
+fn print_config(config: &Config) {
     eprintln!("default sensitivity = {}", config.default_sensitivity);
 
     if !config.processes.is_empty() {
@@ -76,8 +85,6 @@ fn read_config() -> Config {
             eprintln!("{} ({})", process.display(), entry.sensitivity)
         }
     }
-
-    config
 }
 
 fn on_focus_changed(config: &Config, driver: &mut Driver, process: &hook::Process) {

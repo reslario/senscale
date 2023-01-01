@@ -1,4 +1,6 @@
-use {argh::FromArgs, std::path::PathBuf};
+use std::str::FromStr;
+
+use {crate::thread_id::ThreadId, argh::FromArgs, std::path::PathBuf};
 
 /// scales your mouse sensitivity on a per-process basis.
 #[derive(FromArgs)]
@@ -29,7 +31,7 @@ pub struct Run {
     /// sets the thread used for message passing
     /// (used internally when running in the background)
     #[argh(option)]
-    pub parent_thread: Option<u32>,
+    pub parent_thread: Option<ThreadId>,
 }
 
 /// stops senscale
@@ -67,3 +69,11 @@ pub struct Adjust {
 #[derive(FromArgs)]
 #[argh(subcommand, name = "config")]
 pub struct Config {}
+
+impl FromStr for ThreadId {
+    type Err = <u32 as FromStr>::Err;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(u32::into)
+    }
+}

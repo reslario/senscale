@@ -4,6 +4,7 @@ mod cfg;
 mod cli;
 mod core;
 mod msg;
+mod thread_id;
 mod windows;
 mod wrap;
 

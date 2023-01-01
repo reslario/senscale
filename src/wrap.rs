@@ -1,7 +1,8 @@
 use {
     crate::{
         cfg::{self, EditableConfig},
-        msg::{self, ThreadMessage},
+        msg,
+        thread_id::ThreadId,
         windows::thread,
         Result,
     },
@@ -33,7 +34,7 @@ pub fn run() -> io::Result<()> {
 
 #[derive(Debug, PartialEq, Eq)]
 struct Child {
-    thread_id: u32,
+    thread_id: ThreadId,
     output_pos: u64,
 }
 
@@ -66,7 +67,7 @@ impl Child {
     fn to_bytes(&self) -> [u8; 12] {
         let mut out = [0; 12];
         let (a, b) = out.split_at_mut(4);
-        a.copy_from_slice(&self.thread_id.to_le_bytes());
+        a.copy_from_slice(&u32::from(self.thread_id).to_le_bytes());
         b.copy_from_slice(&self.output_pos.to_le_bytes());
         out
     }
@@ -78,7 +79,7 @@ impl Child {
         b.copy_from_slice(right);
 
         Child {
-            thread_id: u32::from_le_bytes(a),
+            thread_id: u32::from_le_bytes(a).into(),
             output_pos: u64::from_le_bytes(b),
         }
     }
@@ -117,7 +118,14 @@ impl Child {
     }
 
     fn send(&self, msg: msg::Server) -> io::Result<()> {
-        msg.send(self.thread_id)
+        self.thread_id.send(msg)
+    }
+
+    fn send_msg_with_response(msg: msg::Server) -> io::Result<()> {
+        let mut child = Child::load()?;
+        child.send(msg)?;
+        child.wait_for_output()?;
+        child.save()
     }
 }
 
@@ -128,12 +136,12 @@ pub fn stop() -> io::Result<()> {
 }
 
 pub fn reload() -> io::Result<()> {
-    let mut child = Child::load()?;
-    child.send(msg::Server::Reload {
-        msg_thread: thread::current_id(),
-    })?;
-    child.wait_for_output()?;
-    child.save()
+    Child::send_msg_with_response(msg::Server::Reload {
+        params: msg::ReloadParams {
+            thread: thread::current_id(),
+            print: true,
+        },
+    })
 }
 
 pub fn clean() {
@@ -214,7 +222,12 @@ fn set_sens(config_path: impl AsRef<Path>, process: PathBuf, sens: f64) -> Resul
 
     cfg::write_config(&config, BufWriter::new(file))?;
 
-    let _ = reload();
+    Child::send_msg_with_response(msg::Server::Reload {
+        params: msg::ReloadParams {
+            thread: thread::current_id(),
+            print: false,
+        },
+    })?;
 
     Ok(())
 }
@@ -247,7 +260,7 @@ mod test {
 
     #[test]
     fn child_to_bytes() {
-        let thread_id = u32::MAX;
+        let thread_id = u32::MAX.into();
         let output_pos = 9259542123273814144;
 
         assert_eq!(
@@ -264,7 +277,7 @@ mod test {
     fn child_from_bytes() {
         assert_eq!(
             Child {
-                thread_id: u32::MAX,
+                thread_id: u32::MAX.into(),
                 output_pos: 9259542123273814144
             },
             Child::from_bytes([255, 255, 255, 255, 128, 128, 128, 128, 128, 128, 128, 128])
@@ -274,7 +287,7 @@ mod test {
     #[test]
     fn child_roundtrip() {
         let child = Child {
-            thread_id: 31267374,
+            thread_id: 31267374_u32.into(),
             output_pos: 9613725632561,
         };
         assert_eq!(child, Child::from_bytes(child.to_bytes()))

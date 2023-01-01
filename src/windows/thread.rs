@@ -1,5 +1,5 @@
 use {
-    crate::windows,
+    crate::{thread_id::ThreadId, windows},
     std::{io, path::PathBuf},
     winapi::um::{
         processthreadsapi::{GetCurrentThreadId, GetProcessIdOfThread, OpenThread},
@@ -7,12 +7,18 @@ use {
     },
 };
 
-pub fn current_id() -> u32 {
-    unsafe { GetCurrentThreadId() }
+pub fn current_id() -> ThreadId {
+    unsafe { GetCurrentThreadId() }.into()
 }
 
-pub fn process_exe_path(thread_id: u32) -> Option<io::Result<PathBuf>> {
-    let handle = unsafe { OpenThread(THREAD_QUERY_LIMITED_INFORMATION, false.into(), thread_id) };
+pub fn process_exe_path(thread_id: ThreadId) -> Option<io::Result<PathBuf>> {
+    let handle = unsafe {
+        OpenThread(
+            THREAD_QUERY_LIMITED_INFORMATION,
+            false.into(),
+            thread_id.into(),
+        )
+    };
 
     if handle.is_null() {
         return None

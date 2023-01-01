@@ -1,5 +1,5 @@
 use {
-    crate::windows::util::validate,
+    crate::{thread_id::ThreadId, windows::util::validate},
     std::{io, mem::MaybeUninit},
     winapi::{
         shared::windef::HWND,
@@ -21,10 +21,12 @@ const MAX: u32 = 0;
 pub trait ThreadMessage: Sized {
     fn try_from(ident: usize, param: isize) -> Option<Self>;
     fn as_raw(&self) -> (usize, isize);
+}
 
-    fn send(&self, thread: u32) -> io::Result<()> {
-        let (ident, param) = self.as_raw();
-        send_message(thread, ident, param)
+impl ThreadId {
+    pub fn send(self, msg: impl ThreadMessage) -> io::Result<()> {
+        let (ident, param) = msg.as_raw();
+        validate(unsafe { PostThreadMessageA(self.into(), WM_COMMAND, ident, param) })
     }
 }
 
@@ -49,7 +51,7 @@ macro_rules! message {
 
                 match ident {
                     $(
-                        $variant => $name::$variant $({ $field: param as _ })?
+                        $variant => $name::$variant $({ $field: param.into() })?
                     ),*,
                     _ => return None
                 }.into()
@@ -60,7 +62,7 @@ macro_rules! message {
                     $(
                         // the `- 0` at the end is a hack to provide a default value of
                         // `0` in case no `$field` is present
-                        $name::$variant $({ $field })? => ($tag as _, $(*$field as isize)? - 0)
+                        $name::$variant $({ $field })? => ($tag as _, $(isize::from(*$field))? - 0)
                     ),*
                 }
             }
@@ -68,22 +70,79 @@ macro_rules! message {
     };
 }
 
+impl From<isize> for ThreadId {
+    fn from(param: isize) -> ThreadId {
+        <_>::from(param as u32)
+    }
+}
+
+impl From<ThreadId> for isize {
+    fn from(id: ThreadId) -> isize {
+        u32::from(id) as _
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct ReloadParams {
+    pub thread: ThreadId,
+    /// will default to `true` when sent if it can't be encoded due to message
+    /// param size limitations
+    pub print: bool,
+}
+
+#[cfg(test)]
+static CAN_ENCODE_PRINT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+
+impl ReloadParams {
+    #[cfg(not(test))]
+    const fn can_encode_print() -> bool {
+        isize::BITS > u32::BITS
+    }
+
+    #[cfg(test)]
+    fn can_encode_print() -> bool {
+        CAN_ENCODE_PRINT.load(std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
+impl From<isize> for ReloadParams {
+    fn from(param: isize) -> Self {
+        if Self::can_encode_print() && param.is_negative() {
+            ReloadParams {
+                thread: <_>::from(-param),
+                print: false,
+            }
+        } else {
+            ReloadParams {
+                thread: <_>::from(param),
+                print: true,
+            }
+        }
+    }
+}
+
+impl From<ReloadParams> for isize {
+    fn from(params: ReloadParams) -> Self {
+        if ReloadParams::can_encode_print() && !params.print {
+            -isize::from(params.thread)
+        } else {
+            params.thread.into()
+        }
+    }
+}
+
 message! {
     Server {
         Stop = '🛑',
-        Reload { msg_thread: u32 } = '♻'
+        Reload { params: ReloadParams } = '♻'
     }
 }
 
 message! {
     Client {
-        Running { msg_thread: u32 } = '🏃',
+        Running { msg_thread: ThreadId } = '🏃',
         Printed = '🖨'
     }
-}
-
-fn send_message(thread: u32, ident: usize, param: isize) -> io::Result<()> {
-    validate(unsafe { PostThreadMessageA(thread, WM_COMMAND, ident, param) })
 }
 
 pub fn wait<T: ThreadMessage>() -> Option<T> {
@@ -131,7 +190,10 @@ mod test {
     use {
         super::*,
         crate::windows::thread as win_thread,
-        std::{sync::mpsc, thread},
+        std::{
+            sync::{self, mpsc},
+            thread,
+        },
     };
 
     #[test]
@@ -140,21 +202,26 @@ mod test {
         let client = Client::Running {
             msg_thread: current,
         };
-        let server = Server::Reload { msg_thread: 21 };
+        let server = Server::Reload {
+            params: ReloadParams {
+                thread: 21_u32.into(),
+                print: true,
+            },
+        };
 
         let (tx, rx) = mpsc::channel();
 
         let thread = thread::spawn(move || {
             // force the message queue to be created
-            let _ = client.send(0);
+            let _ = ThreadId::from(0_u32).send(client);
 
             tx.send(win_thread::current_id()).unwrap();
             assert_eq!(Some(client), wait());
-            server.send(current).unwrap();
+            current.send(server).unwrap();
         });
 
         let thread_id = rx.recv().unwrap();
-        client.send(thread_id).unwrap();
+        thread_id.send(client).unwrap();
         thread.join().unwrap();
 
         assert_eq!(Some(server), wait())
@@ -166,15 +233,20 @@ mod test {
         let client = [Client::Printed, Client::Running {
             msg_thread: current,
         }];
-        let server = [Server::Stop, Server::Reload { msg_thread: 21 }];
+        let server = [Server::Stop, Server::Reload {
+            params: ReloadParams {
+                thread: 21_u32.into(),
+                print: true,
+            },
+        }];
 
         let thread = thread::spawn(move || {
             for msg in client {
-                msg.send(current).unwrap();
+                current.send(msg).unwrap();
             }
 
             for msg in server {
-                msg.send(current).unwrap();
+                current.send(msg).unwrap();
             }
         });
 
@@ -192,5 +264,22 @@ mod test {
         assert_received(server);
 
         thread.join().unwrap();
+    }
+
+    #[test]
+    fn test_reload_params_repr() {
+        assert_eq!(ReloadParams::from(-111111_isize), ReloadParams {
+            thread: 111111_u32.into(),
+            print: false
+        });
+
+        CAN_ENCODE_PRINT.store(false, sync::atomic::Ordering::SeqCst);
+
+        let id = -111111_isize;
+
+        assert_eq!(ReloadParams::from(id), ReloadParams {
+            thread: id.into(),
+            print: true
+        })
     }
 }
