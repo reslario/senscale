@@ -6,7 +6,6 @@ use {
             hook::{Handler, Process},
         },
     },
-    once_cell::sync::Lazy,
     std::sync::{Mutex, MutexGuard},
 };
 
@@ -50,4 +49,4 @@ impl State {
     }
 }
 
-static STATE: Lazy<Mutex<Option<State>>> = Lazy::new(<_>::default);
+static STATE: Mutex<Option<State>> = Mutex::new(None);
